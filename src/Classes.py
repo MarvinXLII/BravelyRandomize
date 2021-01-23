@@ -826,19 +826,12 @@ class TREASURES:
         random.shuffle(candidates)
         for treasureList in self.entries.values():
             for i, treasure in enumerate(treasureList):
-                if i >= 90000: continue # Skip key items & asterisks
+                if treasure[0] >= 90000: continue # Skip key items & asterisks
                 if any(treasure): # Skip empty slots
                     treasureList[i] = candidates.pop()
 
         # Copy chests from airship (ch 6+) to ship
         self.entries['TW_14.trb'][:7] = self.entries['TW_20.trb'][:7]
-                    
-        # # FOR TESTING
-        # for n, treasureList in enumerate(self.entries.values()):
-        #     for i, treasure in enumerate(treasureList):
-        #         if i >= 90000: continue # Skip key items & asterisks
-        #         if any(treasure): # Skip empty slots
-        #             treasureList[i] = (30100+n, 0, 1)
 
         for subFile, treasureList in self.entries.items():
             itemId, money, numItems = zip(*treasureList)
@@ -856,7 +849,7 @@ class TREASURES:
             print(self.fileToLoc[subFile]+':')
             for itemId, money, numItems in treasureList:
                 if money:
-                    print('  ', f"${money} pg")
+                    print('  ', f"{money} pg")
                 elif numItems > 2:
                     print('  ', self.itemIdToName[itemId], f"x{numItems}")
                 elif itemId:

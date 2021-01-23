@@ -12,7 +12,7 @@ sys.path.append('src')
 from Utilities import get_filename
 from Classes import ROM
 
-MAIN_TITLE = f"Bravely Randomizer v{RELEASE}"
+MAIN_TITLE = f"Bravely Randomize v{RELEASE}"
 
 # Source: https://www.daniweb.com/programming/software-development/code/484591/a-tooltip-class-for-tkinter
 class CreateToolTip(object):
@@ -51,7 +51,7 @@ class CreateToolTip(object):
 class GuiApplication:
     def __init__(self, settings=None):
         self.master = tk.Tk()
-        self.master.geometry('705x640')
+        self.master.geometry('680x400')
         self.master.title(MAIN_TITLE)
         self.initialize_gui()
         self.initialize_settings(settings)
@@ -207,12 +207,14 @@ class GuiApplication:
         # Check directory name
         if not self.checkPath(path):
             self.settings['rom'].set('')
-            self.bottomLabel('Selected folder must be "romfs" or "RomFS".', 'red', 0)
+            self.bottomLabel('Mrgrgrgrgr!', 'red', 0)
+            self.bottomLabel('Selected folder must be "romfs" or "RomFS".', 'red', 1)
             return
         # SHA256 checks
         if not self.checkROM(path):
             self.settings['rom'].set('')
-            self.bottomLabel('Must use unmodified files from a North American release.', 'red', 0)
+            self.bottomLabel('Mrgrgrgrgr!', 'red', 0)
+            self.bottomLabel('Must use unmodified files from a North American release.', 'red', 1)
             return
         # Set path to valid rom
         self.settings['rom'].set(path)
@@ -279,7 +281,8 @@ class GuiApplication:
             self.bottomLabel('Randomizing...done! Good luck!', 'blue', 0)
         except:
             self.clearBottomLabels()
-            self.bottomLabel('Randomizing failed.', 'red', 0)
+            self.bottomLabel('Mrgrgrgrgr! Randomizing failed.', 'red', 0)
+            self.bottomLabel('Randomizing failed.', 'red', 1)
 
 
 def randomize(settings):
