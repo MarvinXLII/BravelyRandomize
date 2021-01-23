@@ -1,0 +1,73 @@
+{
+  "Settings": {
+    Jobs: [
+      {      
+	name: jobs-commands
+	label: Shuffle commands, spells, and support abilities
+	type: checkbutton
+	help: "Shuffles abilities amongs jobs. NB: Summon abilities are currently omitted."
+      }
+      {
+	name: jobs-specialties
+	label: Randomly assign specialties
+	type: checkbutton
+	help: "Each job will be randomly assigned a support skill as their specialy."
+      }
+      {      
+	name: jobs-sa-costs
+	label: Shuffle costs of support abilities 
+	type: checkbutton
+	help: "Shuffles the costs of support abilities."
+      }
+      {      
+	name: jobs-stats
+	label: Shuffle stats
+	type: checkbutton
+	help: "Shuffles HP, MP, ... stat scalings independently among all jobs."
+      }
+    ]
+    "Quality of Life": [
+      {      
+	name: qol-exp
+	label: Rescale EXP earned.
+	type: spinbox
+	help: "Recales the Experience earned from battles."
+	spinbox: {
+	  min: 0
+	  max: 10
+	  default: 1
+	}
+      }
+      {      
+	name: qol-jp
+	label: Rescale JP earned.
+	type: spinbox
+	help: "Recales the Job Points earned from battles."
+	spinbox: {
+	  min: 0
+	  max: 10
+	  default: 1
+	}
+      }
+      {      
+	name: qol-pg
+	label: Rescale pg earned.
+	type: spinbox
+	help: "Recales the pg earned from battles."
+	spinbox: {
+	  min: 0
+	  max: 10
+	  default: 1
+	}
+      }
+    ]
+    Treasures: [
+      {
+	name: treasures
+	label: Shuffle chests and hidden items
+	type: checkbutton
+	help: "Shuffles contents off chests and all hidden items. Magic spell can be included!"
+      }
+    ]
+  }
+}

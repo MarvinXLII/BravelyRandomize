@@ -1,0 +1,12 @@
+{
+  rom: /path/to/romfs
+  seed: 42
+  jobs-commands: True
+  jobs-specialties: True
+  jobs-sa-costs: True
+  jobs-stats: True
+  qol-exp: 2
+  qol-jp: 2
+  qol-pg: 2
+  treasures: True
+}

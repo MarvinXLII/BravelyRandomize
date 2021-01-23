@@ -1,0 +1,10 @@
+**/__pycache__
+build
+dist
+*~
+seed_*
+*.xlsx*
+*.csv*
+*.txt
+\#*
+settingsMine.json
