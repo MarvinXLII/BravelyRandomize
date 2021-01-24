@@ -9,9 +9,9 @@
       }
       {      
 	name: jobs-spells
-	label: Shuffle spells and summons
+	label: Shuffle spells
 	type: checkbutton
-	help: "Shuffles spells and summons among mages and summoners. Spell levels remain the same, e.g. Black Mage Level 1 could be replaced by White Mage Level 1, but not White Mage Level 5."
+	help: "Shuffles spells among mages. Spell levels remain the same, e.g. Black Mage Level 1 could be replaced by White Mage Level 1, but not White Mage Level 5."
       }
       {
 	name: jobs-specialties
@@ -76,9 +76,9 @@
     Treasures: [
       {
 	name: treasures
-	label: Shuffle chests and hidden items
+	label: Random chests and hidden items
 	type: checkbutton
-	help: "Shuffles contents off chests and all hidden items. Magic spell can be included!"
+	help: "Randomizes contents of chests and all hidden items. They can include spells!"
       }
     ]
   }
