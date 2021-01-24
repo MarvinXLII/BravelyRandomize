@@ -2,10 +2,16 @@
   "Settings": {
     Jobs: [
       {      
-	name: jobs-commands
-	label: Shuffle commands, spells, and support abilities
+	name: jobs-abilities
+	label: Shuffle commands and support abilities
 	type: checkbutton
-	help: "Shuffles abilities amongs jobs. NB: Summon abilities are currently omitted."
+	help: "Shuffles abilities amongs jobs."
+      }
+      {      
+	name: jobs-spells
+	label: Shuffle spells and summons
+	type: checkbutton
+	help: "Shuffles spells and summons among mages and summoners. Spell levels remain the same, e.g. Black Mage Level 1 could be replaced by White Mage Level 1, but not White Mage Level 5."
       }
       {
 	name: jobs-specialties
@@ -59,6 +65,12 @@
 	  max: 10
 	  default: 1
 	}
+      }
+      {      
+	name: qol-teleport-stones
+	label: Teleport Stones cost 0 pg.
+	type: checkbutton
+	help: "Teleport Stones can be bought from shops for 0 pg. Their selling value is also reduced to 0 pg."
       }
     ]
     Treasures: [

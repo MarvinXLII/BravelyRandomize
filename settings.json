@@ -1,12 +1,14 @@
 {
   rom: /path/to/romfs
   seed: 42
-  jobs-commands: True
+  jobs-abilities: True
+  jobs-spells: True
   jobs-specialties: True
   jobs-sa-costs: True
   jobs-stats: True
-  qol-exp: 2
-  qol-jp: 2
-  qol-pg: 2
+  qol-exp: 20
+  qol-jp: 20
+  qol-pg: 20
+  qol-teleport-stones: True
   treasures: True
 }

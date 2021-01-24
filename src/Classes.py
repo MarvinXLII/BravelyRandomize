@@ -2,6 +2,7 @@ import random
 import os
 import shutil
 import sys
+from copy import deepcopy
 
 class FILE:
     def __init__(self, filename):
@@ -26,7 +27,9 @@ class FILE:
         return data
     
     # Size is typically 1 or 2
-    def readString(self, size=1):
+    def readString(self, address=None, size=1):
+        if address: ## THIS IS TEMPORARY, REMOVE IN THE FUTURE
+            self.address = address
         string = ''
         n = self.read(size=size)
         while n > 0:
@@ -53,66 +56,63 @@ class FILE:
         self.data[address:address+origStringLength] = bytearray([0]*origStringLength)
         stringArray = map(ord, string)
         self.patchArray(stringArray, address, size, size=size)
-            
+
+
 
 class ROM:
     def __init__(self, settings):
         self.settings = settings
-        mainDir = os.getcwd()
-        os.chdir(self.settings['rom'])
-        self.paramaterIndex = FILE('Common_en/Paramater/index.fs')
-        self.paramaterCrowd = FILE('Common_en/Paramater/crowd.fs')
-        self.treasureIndex = FILE('Common_en/TreasureTable/index.fs')
-        self.treasureCrowd = FILE('Common_en/TreasureTable/crowd.fs')
-        self.shopIndex = FILE('Common_en/Shop/index.fs')
-        self.shopCrowd = FILE('Common_en/Shop/crowd.fs')
-        self.battleIndex = FILE('Common_en/Battle/index.fs')
-        self.battleCrowd = FILE('Common_en/Battle/crowd.fs')
-        os.chdir(mainDir)
 
-        ## BUILD DATA CLASSES FOR EASY DATA ACCESS AND MANIPULATION
-        self.paramater = DATA(self.paramaterIndex, self.paramaterCrowd)
-        self.treasureTable = DATA(self.treasureIndex, self.treasureCrowd)
-        self.shop = DATA(self.shopIndex, self.shopCrowd)
-        self.battle = DATA(self.battleIndex, self.battleCrowd)
+        pwd = os.getcwd()
+        os.chdir(settings['rom'])
+        self.battle = BATTLE('Common_en/Battle')
+        self.parameter = PARAMETER('Common_en/Paramater')
+        self.treasures = TREASURES('Common_en/TreasureTable', self.parameter)
+        os.chdir(pwd)
 
-        ## BUILD NEW OBJECTS TO MAKE USE OF THIS DATA
-        self.pcs = PCS(self.paramater)
-        self.jobs = JOBS(self.paramater, self.shop)
-        self.treasures = TREASURES(self.treasureTable, self.paramater)
-        self.enemies = ENEMIES(self.battle)
+    def patch(self):
+        self.battle.patch()
+        self.parameter.patch()
+        self.treasures.patch()
         
     def randomize(self):
         random.seed(self.settings['seed'])
-        if self.settings['jobs-commands']:
-            self.jobs.shuffleCommands()
-            self.jobs.shuffleSpells()
+        if self.settings['jobs-abilities']:
+            self.parameter.shuffleAbilities()
+        if self.settings['jobs-spells']:
+            self.parameter.shuffleSpells()
         if self.settings['jobs-specialties']:
-            self.jobs.randomSpecialty() # MUST BE AFTER COMMAND/SUPPORT SHUFFLE
+            self.parameter.randomSpecialty() # MUST BE AFTER COMMAND/SUPPORT SHUFFLE
         if self.settings['jobs-sa-costs']:
-            self.jobs.shuffleSupportAbilityCosts()
+            self.parameter.shuffleSupportCost()
         if self.settings['jobs-stats']:
-            self.jobs.shuffleStats()
+            self.parameter.shuffleStats()
         if self.settings['treasures']:
             self.treasures.shuffleTreasures()
 
 
     # Simpler to rescale enemy data rather than adjust shop costs for pg
     def qualityOfLife(self):
-        # self.pcs.cutEXP(2)
-        # self.pcs.zeroEXP()
-        # self.jobs.cutJP(2)
-        # self.jobs.zeroJP()
-        self.enemies.scaleEXP(self.settings['qol-exp'])
-        self.enemies.scaleJP(self.settings['qol-jp'])
-        self.enemies.scalePG(self.settings['qol-pg'])
+        self.battle.scaleEXP(self.settings['qol-exp'])
+        self.battle.scaleJP(self.settings['qol-jp'])
+        self.battle.scalePG(self.settings['qol-pg'])
+        if self.settings['qol-teleport-stones']:
+            self.parameter.changeItemCost('Teleport Stone', 0)
+
+        ## TESTING OPTIONS
+        if 'no-jp' in self.settings:
+            if self.settings['no-jp']:
+                self.parameter.zeroJP()
+        if 'no-exp' in self.settings:
+            if self.settings['no-exp']:
+                self.parameter.zeroEXP()
+                
 
     def printLogs(self, path):
         temp = sys.stdout
         sys.stdout = open(os.path.join(path, 'spoiler.log'), 'w')
-        self.jobs.printStats()
-        # self.jobs.printMagics()
-        self.jobs.printAbilities()
+        self.parameter.printStats()
+        self.parameter.printAbilities()
         self.treasures.print()
         sys.stdout = temp
         
@@ -125,555 +125,150 @@ class ROM:
             with open(filename, 'wb') as file:
                 file.write(fileData.data)
         
-        writeFile(self.paramaterCrowd)
-        writeFile(self.treasureCrowd)
-        writeFile(self.shopCrowd)
-        writeFile(self.battleCrowd)
+        writeFile(self.parameter.crowdFile)
+        writeFile(self.treasures.crowdFile)
+        writeFile(self.battle.crowdFile)
 
 
-
-# The main purpose of this class is to FIND address of data
-# and help me view data as a table (i.e. rows and columns)
 class DATA:
-    def __init__(self, indexFileObj, crowdFileObj):
-        self.indexFileObj = indexFileObj
-        self.crowdFileObj = crowdFileObj
+    def __init__(self, path):
+        self.indexFile = FILE(os.path.join(path, 'index.fs'))
+        self.crowdFile = FILE(os.path.join(path, 'crowd.fs'))
+        
         self.index = {}
         self.crowd = {}
-        self.subFileToBase = {}
 
-        # JUST NEED OFFSETS FROM INDEX
-        self.indexFileObj.address = 0
-        indexOffset = self.indexFileObj.read()
+        # Read index.fs
+        self.indexFile.address = 0
+        offset = self.indexFile.read()
         while True:
-            base = self.indexFileObj.read()
-            size = self.indexFileObj.read()
-            stringCRC32 = self.indexFileObj.read()
-            subFileName = self.indexFileObj.readString()
-            self.subFileToBase[subFileName] = base
-            if indexOffset == 0:
+            base = self.indexFile.read()
+            size = self.indexFile.read()
+            strCRC32 = self.indexFile.read()
+            fileName = self.indexFile.readString()
+            self.index[fileName] = base
+            if offset == 0:
                 break
-            self.indexFileObj.address = indexOffset
-            indexOffset = self.indexFileObj.read()
+            self.indexFile.address = offset
+            offset = self.indexFile.read()
 
-        for subFileName, base in self.subFileToBase.items():
-            self.crowdFileObj.address = base + 8
-            self.crowd[subFileName] = {}
-            self.crowd[subFileName]['dataAddress'] = base + self.crowdFileObj.read()
-            self.crowd[subFileName]['dataSize'] = self.crowdFileObj.read()
-            # "Commands" for each row of table
-            self.crowd[subFileName]['commandAddress'] = base + self.crowdFileObj.read()
-            self.crowd[subFileName]['commandSize'] = self.crowdFileObj.read()
-            # Both names and descriptions
-            self.crowd[subFileName]['stringAddress'] = base + self.crowdFileObj.read()
-            self.crowd[subFileName]['stringSize'] = self.crowdFileObj.read()
-            # Entry data
-            self.crowd[subFileName]['stride'] = self.crowdFileObj.read()
-            self.crowd[subFileName]['number'] = self.crowdFileObj.read()
-            # Load commands
-            if self.crowd[subFileName]['commandSize'] > 0:
-                self.crowd[subFileName]['commands'] = []
-                self.crowdFileObj.address = self.crowd[subFileName]['commandAddress']
-                while self.crowdFileObj.address < self.crowd[subFileName]['commandAddress'] + self.crowd[subFileName]['commandSize']:
-                    string = self.crowdFileObj.readString()
-                    self.crowd[subFileName]['commands'].append(string)
-            # Load strings and decriptions
-            if self.crowd[subFileName]['stringSize'] > 0:
-                self.crowd[subFileName]['strings'] = []
-                self.crowdFileObj.address = self.crowd[subFileName]['stringAddress']
-                while self.crowdFileObj.address < self.crowd[subFileName]['stringAddress'] + self.crowd[subFileName]['stringSize']:
-                    string = self.crowdFileObj.readString(size=2)
-                    self.crowd[subFileName]['strings'].append(string)
-
-                
-    def getAddress(self, key, row, col):
-        base = self.crowd[key]['dataAddress']
-        stride = self.crowd[key]['stride']
-        offset = col*4 + stride*row
-        return base + offset
-                    
-    # Read a single value of data
-    def readValue(self, key, row, col):
-        address = self.getAddress(key, row, col)
-        return self.crowdFileObj.readValue(address)
-    
-    # Read a "column" of data
-    def readData(self, key, col, row=None, rowCommand=None, numEntries=None):
-        # Identify which row to start from
-        if rowCommand:
-            row = self.crowd[key]['commands'].index(rowCommand)
-        elif not row:
-            row = 0
-        # Identify number of entries to read (i.e. how many rows to read from)
-        if not numEntries:
-            numEntries = self.crowd[key]['number']
-        numEntries = min(numEntries, self.crowd[key]['number'])
-        # Read column of data
-        address = self.getAddress(key, row, col)
-        stride = self.crowd[key]['stride']
-        return self.crowdFileObj.readArray(address, numEntries, stride)
-        
-    # Patch a single value of data
-    def patchValue(self, value, key, row, col):
-        address = self.getAddress(key, row, col)
-        self.crowdFileObj.patch(value, address)
-
-    def patchData(self, data, key, col, row=None, rowCommand=None):
-        # Identify which row to start from
-        if rowCommand:
-            row = self.crowd[key]['commands'].index(rowCommand)
-        elif not row:
-            row = 0
-        # Patch column of data
-        address = self.getAddress(key, row, col)
-        stride = self.crowd[key]['stride']
-        self.crowdFileObj.patchArray(data, address, stride)
-
-    # row and col denote offset
-    def patchString(self, string, key, row, col):
-        offset = self.readValue(key, row, col)
-        base = self.crowd[key]['stringAddress']
-        self.crowdFileObj.patchString(string, base+offset, size=2)
-
-
-class ENEMIES:
-    def __init__(self, battle):
-        self.battle = battle
-
-    def scaleArray(self, array, scale, maxValue):
-        newArray = [ min(a * scale, maxValue) for a in array ]
-        return newArray
-        
-    def scaleEXP(self, scale):
-        exp = self.battle.readData('MonsterData.btb', 91)
-        newExp = self.scaleArray(exp, scale, 999999)
-        self.battle.patchData(newExp, 'MonsterData.btb', 91)
-
-    def scaleJP(self, scale):
-        jp = self.battle.readData('MonsterData.btb', 92)
-        newJP = self.scaleArray(jp, scale, 999)
-        self.battle.patchData(newJP, 'MonsterData.btb', 92)
-
-    def scalePG(self, scale):
-        pg = self.battle.readData('MonsterData.btb', 93)
-        newPG = self.scaleArray(pg, scale, 999999)
-        self.battle.patchData(newPG, 'MonsterData.btb', 93)
-        
-
-class PCS:
-    def __init__(self, paramater):
-        self.paramater = paramater
-        self.subFiles = [f"PcLevelTable00{i}.btb" for i in range(1, 5)]
-
-    def zeroEXP(self):
-        for subFile in self.subFiles:
-            self.paramater.patchData([0]*99, subFile, 1) # TOTAL EXP
-            self.paramater.patchData([0]*99, subFile, 2) # EXP FOR NEXT LEVEL
-
-    def cutEXP(self, divisor):
-        divisor *= 5
-        for subFile in self.subFiles:
-            exp = self.paramater.readData(subFile, 2)
-            exp = [ round(e/divisor)*5 for e in exp ] # End with 0 or 5
-            total = [exp[0]]*len(exp)
-            for i in range(1, len(exp)):
-                total[i] = total[i-1] + exp[i]
-            self.paramater.patchData(total, subFile, 1)
-            self.paramater.patchData(exp, subFile, 2)
-        
-
-class JOBS:
-    ## LOAD ALL DATA THAT WILL BE MODIFIED/PATCHED
-    ## CONSIDER DATA THAT IS GAME-SPECIFIC (DIFFERENT COLUMN IN BS???)
-    def __init__(self, paramater, shops):
-        self.paramater = paramater
-        self.shops = shops
-        self.jobFiles = []
-
-        # SPECIFY LISTS OF STRINGS NEEDED (THAT CANNOT BE READ FOR VARIOUS REASONS)
-        for i in range(24):
-            j = str(i).rjust(2, '0')
-            self.jobFiles.append(f'JobTable{j}.btb')
-        # self.shopMagicFiles = filter(lambda x: 'TW' in x, self.shops.subFileToBase.keys())
-        # self.shopMagicFiles = filter(lambda x: 'Magic' in x, self.shopMagicFiles)
-        # self.shopMagicFiles = list(filter(lambda x: '99' not in x, self.shopMagicFiles))
-        
-        self.jobNames = [
-            'Freelancer', 'Knight', 'Black Mage', 'White Mage', 'Monk', 'Ranger',
-            'Ninja', 'Time Mage', 'Spell Fencer', 'Swordmaster', 'Pirate', 'Dark Knight',
-            'Templar', 'Vampire', 'Arcanist', 'Summoner', 'Conjurer', 'Valkyrie',
-            'Spiritmaster', 'Salve-Maker', 'Red Mage', 'Thief', 'Merchant', 'Performer',
-        ]
-
-        # List mage subfiles
-        self.mageNames = ['Black Mage', 'Spell Fencer', 'Summoner', 'Conjurer',
-                          'Time Mage', 'Red Mage', 'White Mage']
-        # self.mageSubFiles = ['AbilityBMG.btb', 'AbilityMGS.btb', 'AbilitySMG.btb','AbilitySMU.btb',
-        #                  'AbilityTMG.btb','AbilityWBM.btb','AbilityWMG.btb']
-
-
-        # LOAD VARIOUS COLUMNS OF DATA TO BE MODIFIED & PATCHED
-
-        
-        # Load all abilities
-        self.commandIds = self.paramater.readData('CommandAbility.btb', 0)
-        self.commandNames = self.paramater.crowd['CommandAbility.btb']['strings'][::2]
-        self.comIdToName = {i:n for n, i in zip(self.commandNames, self.commandIds)} # ID TO NAME IS UNIQUE
-        self.comIdToName[361] = 'Genome Ability'
-        for i in range(75, 94): # add SF to SpellFencer names
-            self.comIdToName[i] = self.comIdToName[i] + '*'
-        self.comNameToId = {n:i for i,n in self.comIdToName.items()}
-        self.supportIds = self.paramater.readData('SupportAbility.btb', 0)
-        self.supportNames = self.paramater.crowd['SupportAbility.btb']['strings'][::2]
-        self.supNameToId = {n:i for n, i in zip(self.supportNames, self.supportIds)}
-        self.supIdToName = {i:n for n, i in zip(self.supportNames, self.supportIds)}
-        self.supportCosts = self.paramater.readData('SupportAbility.btb', 5)
-        self.supIdToCosts = {i:c for i, c in zip(self.supportIds, self.supportCosts)}
-
-        # Load command titles
-        self.commandTitles = self.paramater.crowd['JobCommand.btb']['strings'][::2]
-        self.commandTitleId = self.paramater.readData('JobCommand.btb', 0)
-        self.commandIconId = self.paramater.readData('JobCommand.btb', 4)
-        self.titleIdToTitle = {i:t for i,t in zip(self.commandTitleId, self.commandTitles)}
-        self.titleIdToTitle[0] = None
-        self.titleIdToIcon = {t:i for t, i in zip(self.commandTitleId, self.commandIconId)}
-        
-        # Load all job commands and stats
-        self.jobStats = {}
-        self.jobTitles = {}
-        self.jobCommands = {}
-        self.jobSpecialty = {}
-        self.isSpellCaster = {}
-        self.isCommand = {i:False for i in self.commandIds} # Will need to filter commands
-        for jobName, subFile in zip(self.jobNames, self.jobFiles):
-            self.jobSpecialty[jobName] = self.paramater.readValue(subFile, 0, 12)
-            self.jobCommands[jobName] = self.paramater.readData(subFile, 13)
-            self.jobTitles[jobName] = self.paramater.readData(subFile, 16)
-            self.isSpellCaster[jobName] = 0 in self.jobCommands[jobName]
-            for i in self.jobCommands[jobName]:
-                if i in self.isCommand:
-                    self.isCommand[i] = True
-            self.jobStats[jobName] = {
-                'HP': self.paramater.readData(subFile, 4),
-                'MP': self.paramater.readData(subFile, 5),
-                'STR': self.paramater.readData(subFile, 6),
-                'VIT': self.paramater.readData(subFile, 7),
-                'INT': self.paramater.readData(subFile, 8),
-                'MND': self.paramater.readData(subFile, 9),
-                'DEX': self.paramater.readData(subFile, 10),
-                'AGI': self.paramater.readData(subFile, 11),
+        # Read crowd.fs file header
+        for fileName, base in self.index.items():
+            self.crowdFile.address = base + 8
+            self.crowd[fileName] = {
+                'dataBase' : base + self.crowdFile.read(),
+                'dataSize' : self.crowdFile.read(),
+                'commandBase' : base + self.crowdFile.read(),
+                'commandSize' : self.crowdFile.read(),
+                'stringBase' : base + self.crowdFile.read(),
+                'stringSize' : self.crowdFile.read(),
+                'stride' : self.crowdFile.read(),
+                'number' : self.crowdFile.read(),
             }
 
-        # Load spell/fencer/summon commands
-        self.isMagic = {i:False for i in self.commandIds} # Filter magic spells
-        self.isFencer = {i:False for i in self.commandIds} # Filter fencing spells
-        self.isSummon = {i:False for i in self.commandIds} # Filter summons
-        self.mageSpells = {}
-        self.spellIdToItem = {}
-        def loadSpells(name, subFile, boolDict):
-            spellId = self.paramater.readData(subFile, 1)
-            itemId = self.paramater.readData(subFile, 2)
-            for s, i in zip(spellId, itemId):
-                self.spellIdToItem[s] = i
-            self.mageSpells[name] = spellId
-            for spell in spellId:
-                boolDict[spell] = True
+    def getAddress(self, fileName, row, col):
+        base = self.crowd[fileName]['dataBase']
+        stride = self.crowd[fileName]['stride']
+        offset = col*4 + stride*row
+        return base + offset
 
-        loadSpells('Spell Fencer', 'AbilityMGS.btb', self.isFencer)
-        loadSpells('Summoner', 'AbilitySMG.btb', self.isSummon)
-        loadSpells('Conjurer', 'AbilitySMU.btb', self.isSummon)
-        loadSpells('Black Mage', 'AbilityBMG.btb', self.isMagic)
-        loadSpells('White Mage', 'AbilityWMG.btb', self.isMagic)
-        loadSpells('Red Mage', 'AbilityWBM.btb', self.isMagic)
-        loadSpells('Time Mage', 'AbilityTMG.btb', self.isMagic)
+    def readValue(self, fileName, row, col):
+        address = self.getAddress(fileName, row, col)
+        return self.crowdFile.readValue(address)
+
+    def patchValue(self, value, fileName, row, col):
+        address = self.getAddress(fileName, row, col)
+        self.crowdFile.patch(value, address)
+
+    def readData(self, fileName, col, row=None, num=None):
+        if not row:
+            row = 0
+        if not num:
+            num = self.crowd[fileName]['number']
+        num = min(num, self.crowd[fileName]['number'])
+        # Read column of data
+        address = self.getAddress(fileName, row, col)
+        stride = self.crowd[fileName]['stride']
+        return self.crowdFile.readArray(address, num, stride)
+
+    def patchData(self, data, fileName, col, row=None):
+        if not row:
+            row = 0
+        # Patch column of data
+        address = self.getAddress(fileName, row, col)
+        stride = self.crowd[fileName]['stride']
+        self.crowdFile.patchArray(data, address, stride)
+
+    def readCommand(self, fileName, row, col):
+        offset = self.getAddress(fileName, row, col)
+        base = self.crowd[fileName]['commandBase']
+        return self.crowdFile.readString(address=base+offset, size=1)
         
-        # Icon stuff
-        self.supportJobIds = self.paramater.readData('SupportAbility.btb', 2)
-        self.supportIconCommands = self.paramater.readData('SupportAbility.btb', 66)
-        self.supJobIdToIcon = {sup:com for sup, com in zip(self.supportJobIds, self.supportIconCommands)}
+    def patchCommand(self, string, fileName, row, col):
+        offset = self.getAddress(fileName, row, col)
+        base = self.crowd[fileName]['commandBase']
+        self.crowdFile.patchString(string, base+offset, size=1)
+
+    def readString(self, fileName, row, col):
+        offset = self.readValue(fileName, row, col)
+        base = self.crowd[fileName]['stringBase']
+        return self.crowdFile.readString(address=base+offset, size=2)
         
+    def patchString(self, string, fileName, row, col):
+        offset = self.readValue(fileName, row, col)
+        base = self.crowd[fileName]['stringBase']
+        self.crowdFile.patchString(string, base+offset, size=2)
 
-    def shuffleCommands(self):
-
-        # Assign support skills to mages first
-        candidates = list(self.supportIds)
-        random.shuffle(candidates)
-        names = filter(lambda x: self.isSpellCaster[x], self.jobNames)
-        for name in names:
-            commands = self.jobCommands[name]
-            for i, c in enumerate(commands):
-                if c > 0:
-                    commands[i] = candidates.pop()
-
-        # Assign skills to remaining jobs
-        commands = sorted(set(filter(lambda x: self.isCommand[x], self.commandIds)))        
-        candidates += commands
-        random.shuffle(candidates)
-        names = filter(lambda x: not self.isSpellCaster[x], self.jobNames)
-        n = len(self.jobCommands[self.jobNames[0]])
-        for name in names:
-            for i in range(n):
-                self.jobCommands[name][i] = candidates.pop()
-
-        # Patch all job commands
-        for name, subFile in zip(self.jobNames, self.jobFiles):
-            self.paramater.patchData(self.jobCommands[name], subFile, 13)
-
-        # Update support ability icons
-        commandToJobId = {}
-        for i, name in enumerate(self.jobNames):
-            for command in self.jobCommands[name]:
-                commandToJobId[command] = i
-
-        jobIds = [0] * len(self.supportIds)
-        icons = [0] * len(self.supportIds)
-        for i, s in enumerate(self.supportIds):
-            if s in commandToJobId:
-                jobIds[i] = commandToJobId[s]
-                icons[i] = self.supJobIdToIcon[commandToJobId[s]]
-
-        self.paramater.patchData(jobIds, 'SupportAbility.btb', 2)
-        self.paramater.patchData(jobIds, 'SupportAbilityAL.btb', 2)
-        self.paramater.patchData(icons, 'SupportAbility.btb', 66)
-        self.paramater.patchData(icons, 'SupportAbilityAL.btb', 66)
-
-            
-
-    # OMIT SUMMONS
-    def shuffleSpells(self):
-
-        mageFiles = []
-        mageNames = []
-        mageTitles = []
-        for jobName, subFile in zip(self.jobNames, self.jobFiles):
-            if self.isSpellCaster[jobName]:
-                mageFiles.append(subFile)
-                mageNames.append(jobName)
-                mageTitles.append(self.jobTitles[jobName])
-        magicByJob = [list(filter(lambda x: x > 0, m)) for m in mageTitles]
-
-        # Shuffle levels first
-        for magic in magicByJob:
-            random.shuffle(magic)
-
-        # Shuffle across jobs at each level
-        for i in range(6):
-            level = []
-            for m in magicByJob:
-                if i < len(m): # Only 4 entries for Red Mage
-                    level.append(m[i])
-            random.shuffle(level)
-            for m in magicByJob:
-                if i < len(m):
-                    m[i] = level.pop()
-                
-        # Update self.jobTitles via mageTitles
-        oldToNewCommand = {}
-        for i, name in enumerate(mageNames):
-            titles = mageTitles[i]
-            magicLevels = magicByJob[i]
-            for i, ti in enumerate(titles):
-                if ti > 0:
-                    # titles[i] = magicLevels.pop(0)
-                    old = titles[i]
-                    new = magicLevels.pop(0)
-                    oldToNewCommand[old] = new
-                    titles[i] = new
-
-        # Patch titles
-        for name, subFile in zip(mageNames, mageFiles):
-            self.paramater.patchData(self.jobTitles[name], subFile, 16)
-
-        # Update title descriptions ?????????????
-        commands = self.paramater.readData('JobTable.btb', 4)
-        newToOldCommand = {n:o for o, n in oldToNewCommand.items()}
-        for i, ti in enumerate(commands):
-            if ti in oldToNewCommand:
-                commands[i] = oldToNewCommand[ti]
-        for i, ti in enumerate(self.commandTitleId):
-            if ti in newToOldCommand:
-                self.commandIconId[i] = self.titleIdToIcon[newToOldCommand[ti]]
-        self.paramater.patchData(commands, 'JobTable.btb', 4)
-        self.paramater.patchData(self.commandIconId, 'JobCommand.btb', 4)
-
-        # Overwrite all magic command strings
-        for i, comId in enumerate(self.commandTitleId):
-            if comId in oldToNewCommand: # Check if it is a magic/summon command
-                self.paramater.patchString('Cast magic/summons.', 'JobCommand.btb', i, 3)
+    def readStringList(self, fileName, col):
+        strings = []
+        for i in range(self.crowd[fileName]['number']):
+            strings.append(self.readString(fileName, i, col))
+        return strings
         
 
-    def randomSpecialty(self):
+class BATTLE(DATA):
+    def __init__(self, path):
+        super().__init__(path)
+        self.exp = self.readData('MonsterData.btb', 91)
+        self.jp = self.readData('MonsterData.btb', 92)
+        self.pg = self.readData('MonsterData.btb', 93)
 
-        candidates = list(self.supportIds)
-        candidates.remove(self.supNameToId['Genome Drain'])
-        random.shuffle(candidates)
-        for name in self.jobNames:
-            if self.comNameToId['Genome Ability'] in self.jobCommands[name]:
-                self.jobSpecialty[name] = self.supNameToId['Genome Drain']
-            else:
-                self.jobSpecialty[name] = candidates.pop()
+    def patch(self):
+        self.patchData(self.exp, 'MonsterData.btb', 91)
+        self.patchData(self.jp, 'MonsterData.btb', 92)
+        self.patchData(self.pg, 'MonsterData.btb', 93)
 
-        # Patch all specialties
-        for name, subFile in zip(self.jobNames, self.jobFiles):
-            self.paramater.patchValue(self.jobSpecialty[name], subFile, 0, 12)
-
-    def shuffleSupportAbilityCosts(self):
-        random.shuffle(self.supportCosts)
-        for cost, supId in zip(self.supportCosts, self.supIdToCosts.keys()):
-            self.supIdToCosts[supId] = cost
-        self.paramater.patchData(self.supportCosts, 'SupportAbility.btb', 5)
-        self.paramater.patchData(self.supportCosts, 'SupportAbilityAL.btb', 5)
-            
+    def scaleArray(self, array, scale, maxValue):
+        return [ min(a*scale, maxValue) for a in array ]
         
+    def scaleEXP(self, scale):
+        self.exp = self.scaleArray(self.exp, scale, 999999)
 
-    def zeroJP(self):
-        for jobFile in self.jobFiles:
-            self.paramater.patchData([0]*14, jobFile, 1)
-            self.paramater.patchData([0]*14, jobFile, 2)
+    def scaleJP(self, scale):
+        self.jp = self.scaleArray(self.jp, scale, 999)
 
-    def cutJP(self, divisor):
-        divisor *= 5
-        for jobFile in self.jobFiles:
-            jp = self.paramater.readData(jobFile, 2)
-            jp = [ round(j/divisor)*5 for j in jp ]
-            total = [jp[0]]*len(jp)
-            for i in range(1, len(jp)):
-                total[i] = total[i-1] + jp[i]
-            self.paramater.patchData(total, jobFile, 1)
-            self.paramater.patchData(jp, jobFile, 2)
+    def scalePG(self, scale):
+        self.pg = self.scaleArray(self.pg, scale, 999999)
 
 
-    def shuffleStats(self):
-        statNames = list(self.jobStats[self.jobNames[0]].keys()) # HP, MP, ...
-        for stat in statNames:
-            # Fisher-Yates on all stat arrays, looping over jobNames
-            for i in range(23, 0, -1):
-                j = random.randint(0, i)
-                nameA = self.jobNames[i]
-                nameB = self.jobNames[j]
-                statsOfJobA = self.jobStats[nameA][stat]
-                statsOfJobB = self.jobStats[nameB][stat]
-                self.jobStats[nameA][stat], self.jobStats[nameB][stat] = statsOfJobB, statsOfJobA
+class TREASURES(DATA):
+    def __init__(self, path, parameter):
+        super().__init__(path)
 
-        # Patch stats
-        for name, subFile in zip(self.jobNames, self.jobFiles):
-            stats = self.jobStats[name]
-            for i, key in enumerate(stats.keys()):
-                self.paramater.patchData(stats[key], subFile, i+4)
+        # Useful lists from parameter
+        self.itemId = parameter.itemId
+        self.itemNames = parameter.itemNames
+        self.itemIdToName = {i:n for i, n in zip(self.itemId, self.itemNames)}
 
-
-    def printStats(self):
-        print('====================')
-        print('JOB STAT AFFINITIES')
-        print('====================')
-        print('')
-        print('')
-
-        jobNames = sorted(self.jobNames)
-        statNames = list(self.jobStats[jobNames[0]].keys())
-        line = ' '*16
-        for s in statNames:
-            line += s.rjust(6, ' ')
-        print(line)
-        print('')
-        for name in jobNames:
-            line = '  '+name.ljust(14, ' ')
-            for stat in self.jobStats[name].values():
-                line += f"{stat[0]}%".rjust(6, ' ')
-            print(line)
-        print('')
-        print('')
-            
-        
-
-    def printMagics(self):
-        print('============')
-        print('MAGIC LEVELS')
-        print('============')
-        print('')
-        print('')
-
-        def printMage(mage):
-            titleId = list(filter(lambda x: x > 0, self.jobTitles[mage]))
-            numLevels = len(titleId)
-            numSpells = len(self.mageSpells[mage])
-            numPerLevel = int(numSpells / numLevels)
-            print(mage)
-            print('-'*len(mage))
-            print('')
-            for i in range(numLevels):
-                titleString = self.titleIdToTitle[titleId[i]]
-                spells = self.mageSpells[mage][i*numPerLevel:(i+1)*numPerLevel]
-                spellNames = ', '.join([self.comIdToName[i] for i in spells])
-                print('  ', titleString.ljust(20, ' '), spellNames)
-            print('')
-            print('')
-
-        printMage('White Mage')
-        printMage('Black Mage')
-        printMage('Red Mage')
-        printMage('Time Mage')
-        printMage('Spell Fencer')
-        printMage('Summoner')
-        printMage('Conjurer')
-
-                
-    def printAbilities(self):
-        # SETUP FOR MAGIC PRINTOUTS
-        
-        print('=============')
-        print('JOB ABILITIES')
-        print('=============')
-        print('')
-        print('')
-        jobNames = sorted(self.jobNames)
-        for name in jobNames:
-            if name in self.mageSpells:
-                spells = list(self.mageSpells[name])
-            print(name)
-            print('-'*len(name))
-            print('')
-            print('  Specialty:', self.supIdToName[self.jobSpecialty[name]])
-            print('')
-            print('  Abilities:')
-            for i, (comId, titleId) in enumerate(zip(self.jobCommands[name], self.jobTitles[name])):
-                if comId in self.comIdToName:
-                    print(f'    {i+1})'.rjust(7, ' '), self.comIdToName[comId])
-                elif comId in self.supIdToName:
-                    print(f'    {i+1})'.rjust(7, ' '), self.supIdToName[comId].ljust(20, ' '), self.supIdToCosts[comId], 'SA')
-                else:
-                    print(f'    {i+1})'.rjust(7, ' '), self.titleIdToTitle[titleId])
-                    
-            print('')
-            print('')
-        print('')
-        print('')
-        print('')
-        print('')
-                    
-
-
-class TREASURES:
-    def __init__(self, treasures, paramater):
-        self.treasures = treasures
-        self.paramater = paramater
-
-        # Misc stuff needed
-        # -- isDummy dict to map ID to bool (use for filtering allExcluded)
-        itemIds = self.paramater.readData('ItemTable.btb', 0)
-        itemNames = self.paramater.crowd['ItemTable.btb']['strings'][::2]
-        self.isDummy = {itemId: 'Dummy' in name for itemId, name in zip(itemIds, itemNames)}
-        self.itemIdToName = {itemId:name for itemId, name in zip(itemIds, itemNames)}
-
-        # Load data from traesures
-        self.entries = {}
-        for subFile in self.treasures.crowd.keys():
-            if subFile == 'TreasureMessageTable.btb':
+        # Load data
+        self.slots = {}
+        for fileName in self.crowd.keys():
+            if fileName == 'TreasureMessageTable.btb':
                 continue
-            itemId = self.treasures.readData(subFile, 1)
-            money = self.treasures.readData(subFile, 2)
-            numItems = self.treasures.readData(subFile, 3)
-            self.entries[subFile] = list(zip(itemId, money, numItems))
+            itemId = self.readData(fileName, 1)
+            money = self.readData(fileName, 2)
+            num = self.readData(fileName, 3)
+            self.slots[fileName] = list(zip(itemId, money, num))
 
         # Subfile locations:
         self.fileToLoc = {
@@ -714,51 +309,52 @@ class TREASURES:
             'TW_19.trb': 'Gravemark Village',
             'TW_20.trb': 'Grandship (Airship, Ch. 6+)'
         }
-
+            
+    def patch(self):
+        for fileName, slotList in self.slots.items():
+            itemId, money, num = zip(*slotList)
+            self.patchData(itemId, fileName, 1)
+            self.patchData(money, fileName, 2)
+            self.patchData(num, fileName, 3)
 
     def shuffleTreasures(self):
 
         candidates = []
-        for treasureList in self.entries.values():
-            candidates += list(filter(lambda x: any(x), treasureList))
-
-        # Add 1 entry of all items not normally found in chests
+        for slotList in self.slots.values():
+            candidates += list(filter(lambda x: any(x), slotList))
+            
+        # Add 1 candidate for all items not normally found in chests
+        isDummy = {i:'Dummy' in self.itemIdToName[i] for i in self.itemId}
         allIncluded = [c[0] for c in candidates]
-        allExcluded = self.paramater.readData('ItemTable.btb', 0)
-        allExcluded = list(filter(lambda x: not self.isDummy[x], allExcluded)) # Filter dummy items
+        allExcluded = list(filter(lambda x: not isDummy[x], self.itemId))     # Filter dummy items
         allExcluded = sorted(list(set(allExcluded).difference(allIncluded))) # Filter included items
-        allExcluded = [(i,0,1) for i in allExcluded]
-        candidates += allExcluded
+        candidates += [(i,0,1) for i in allExcluded]
 
-        # Filter all items and slots not allowed (e.g. key items, asterisks)
+        # Filter all key items
         candidates = list(filter(lambda x: x[0] < 90000, candidates))
 
         # Randomize
         random.shuffle(candidates)
-        for treasureList in self.entries.values():
-            for i, treasure in enumerate(treasureList):
-                if treasure[0] >= 90000: continue # Skip key items & asterisks
-                if any(treasure): # Skip empty slots
-                    treasureList[i] = candidates.pop()
+        for slotList in self.slots.values():
+            for i, slot in enumerate(slotList):
+                if slot[0] >= 90000: continue # Skip key item slots
+                if any(slot): # Skip empty slots
+                    slotList[i] = candidates.pop()
 
-        # Copy chests from airship (ch 6+) to ship
-        self.entries['TW_14.trb'][:7] = self.entries['TW_20.trb'][:7]
+        # Copy chests from airship (ch 6+) to ship EXCLUDING chest key
+        self.slots['TW_14.trb'][:7] = self.slots['TW_20.trb'][:7]
 
-        for subFile, treasureList in self.entries.items():
-            itemId, money, numItems = zip(*treasureList)
-            self.treasures.patchData(itemId, subFile, 1)
-            self.treasures.patchData(money, subFile, 2)
-            self.treasures.patchData(numItems, subFile, 3)
 
     def print(self):
-
         print('=========')
         print('TREASURES')
         print('=========')
         print('')
-        for subFile, treasureList in self.entries.items():
-            print(self.fileToLoc[subFile]+':')
-            for itemId, money, numItems in treasureList:
+        for fileName, slotList in self.slots.items():
+            print(self.fileToLoc[fileName])
+            print('-'*len(self.fileToLoc[fileName]))
+            print('')
+            for itemId, money, numItems in slotList:
                 if money:
                     print('  ', f"{money} pg")
                 elif numItems > 2:
@@ -766,9 +362,385 @@ class TREASURES:
                 elif itemId:
                     print('  ', self.itemIdToName[itemId])
             print('')
+            print('')
         print('')
         print('')
+        print('')
+        print('')
+        
+        
+
+class PARAMETER(DATA):
+    def __init__(self, path):
+        super().__init__(path)
+
+        # File Lists
+        self.pcFiles = [f"PcLevelTable00{i}.btb" for i in range(1, 5)]
+        self.jobFiles = []
+        for i in range(24):
+            j = str(i).rjust(2, '0')
+            self.jobFiles.append(f'JobTable{j}.btb')
+
+        # Names that cannot be loaded
+        self.jobNames = [
+            'Freelancer', 'Knight', 'Black Mage', 'White Mage', 'Monk', 'Ranger',
+            'Ninja', 'Time Mage', 'Spell Fencer', 'Swordmaster', 'Pirate', 'Dark Knight',
+            'Templar', 'Vampire', 'Arcanist', 'Summoner', 'Conjurer', 'Valkyrie',
+            'Spiritmaster', 'Salve-Maker', 'Red Mage', 'Thief', 'Merchant', 'Performer',
+        ]
+
+        self.comIds = self.readData('CommandAbility.btb', 0)
+        self.comNames = self.readStringList('CommandAbility.btb', 4)
+        self.supIds = self.readData('SupportAbility.btb', 0)
+        self.supJobIds = self.readData('SupportAbility.btb', 2)
+        self.supCosts = self.readData('SupportAbility.btb', 5)
+        self.supIcons = self.readData('SupportAbility.btb', 66)
+        self.supNames = self.readStringList('SupportAbility.btb', 3)
+        self.jobComLabelId = self.readData('JobCommand.btb', 0)
+        self.jobComIconId = self.readData('JobCommand.btb', 4)
+        self.jobComLabels = self.readStringList('JobCommand.btb', 1)
+        self.jobTableComId = self.readData('JobTable.btb', 4)
+
+        self.jobSpec = {}
+        self.jobAbil = {}
+        self.jobStats = {}
+        self.jobSpells = {}
+        self.isSpellCaster = {}
+        for name, fileName in zip(self.jobNames, self.jobFiles):
+            self.jobSpec[name] = self.readValue(fileName, 0, 12)
+            self.jobAbil[name] = self.readData(fileName, 13)
+            self.jobSpells[name] = self.readData(fileName, 16)
+            self.isSpellCaster[name] = not all(self.jobAbil[name])
+            self.jobStats[name] = {
+                'HP': self.readData(fileName, 4),
+                'MP': self.readData(fileName, 5),
+                'STR': self.readData(fileName, 6),
+                'VIT': self.readData(fileName, 7),
+                'INT': self.readData(fileName, 8),
+                'MND': self.readData(fileName, 9),
+                'AGI': self.readData(fileName, 10),
+                'DEX': self.readData(fileName, 11),
+            }
+
+        ## LOAD VARIOUS STRINGS
+        self.comNames = self.readStringList('CommandAbility.btb', 4) ## START WITH "STRONG STRIKE"
+        self.supNames = self.readStringList('SupportAbility.btb', 3) ## START WITH "ABSORP P. DAMAGE"
+        
+        ## BUILD DICTS FOR SIMPLER CODE AND PRINTOUTS
+        self.supIdToCost = {i:c for i,c in zip(self.supIds, self.supCosts)}
+        self.supNameToId = {n:i for n,i in zip(self.supNames, self.supIds)}
+        self.comNameToId = {n:i for n,i in zip(self.comNames, self.comIds)}
+        self.comIdToName = {i:n for n,i in zip(self.comNames, self.comIds)}
+
+        ## ITEMS (FOR COSTS AND PRINTOUTS)
+        self.itemCosts = self.readData('ItemTable.btb', 17)
+        self.itemSell = self.readData('ItemTable.btb', 18)
+        self.itemId = self.readData('ItemTable.btb', 0)
+        self.itemNames = self.readStringList('ItemTable.btb', 4)
+        self.itemNameToId = {n:i for n, i in zip(self.itemNames, self.itemId)}
+        self.itemNameToRow = {n:i for i, n in enumerate(self.itemNames)}
+
+    def patch(self):
+        # SUPPORT ABILITIES
+        self.patchData(self.supJobIds, 'SupportAbility.btb', 2)
+        self.patchData(self.supJobIds, 'SupportAbilityAL.btb', 2)
+        self.patchData(self.supCosts, 'SupportAbility.btb', 5)
+        self.patchData(self.supCosts, 'SupportAbilityAL.btb', 5)
+        self.patchData(self.supIcons, 'SupportAbility.btb', 66)
+        self.patchData(self.supIcons, 'SupportAbilityAL.btb', 66)
+        # UPDATED FOR MAGIC
+        self.patchData(self.jobTableComId, 'JobTable.btb', 4)
+        self.patchData(self.jobComIconId, 'JobCommand.btb', 4)
+        # JOB STUFF
+        for name, fileName in zip(self.jobNames, self.jobFiles):
+            # SPECIALTIES 
+            self.patchValue(self.jobSpec[name], fileName, 0, 12)
+            # Abilities
+            self.patchData(self.jobAbil[name], fileName, 13)
+            # Spells
+            self.patchData(self.jobSpells[name], fileName, 16)
+            # STATS
+            stats = self.jobStats[name]
+            for i, s in enumerate(stats.values()):
+                self.patchData(s, fileName, i+4)
+        # ITEM STUFF
+        self.patchData(self.itemCosts, 'ItemTable.btb', 17)
+        self.patchData(self.itemSell, 'ItemTable.btb', 18)
+                
+    # START AT LEVEL 99 (INCLUDED FOR TESTING)
+    def zeroEXP(self):
+        for pcFile in self.pcFiles:
+            self.patchData([0]*99, pcFile, 1) # TOTAL EXP
+            self.patchData([0]*99, pcFile, 2) # EXP FOR NEXT LEVEL
+
+    # START WITH ALL ABILITIES (INCLUDED FOR TESTING)
+    def zeroJP(self):
+        for fileName in self.jobFiles:
+            self.patchData([0]*14, fileName, 1) # TOTAL JP
+            self.patchData([0]*14, fileName, 2) # JP FOR NEXT LEVEL
+
+    # ITEM COSTS
+    def changeItemCost(self, itemName, cost):
+        idx = self.itemNameToRow[itemName]
+        self.itemCosts[idx] = cost
+        self.itemSell[idx] = int(cost/2)
+            
+    def shuffleSupportCost(self):
+        random.shuffle(self.supCosts)
+        self.supIdToCost = {i:c for i,c in zip(self.supIds, self.supCosts)}
+
+    def randomSpecialty(self):
+        candidates = list(self.supIds)
+        candidates.remove(self.supNameToId['Genome Drain'])
+        random.shuffle(candidates)
+        for name in self.jobNames:
+            if self.comNameToId['Genome Ability'] in self.jobAbil[name]:
+                self.jobSpec[name] = self.supNameToId['Genome Drain']
+            else:
+                self.jobSpec[name] = candidates.pop()
+
+    def shuffleStats(self):
+        statNames = self.jobStats[self.jobNames[0]].keys()
+        for stat in statNames:
+            for i in range(23, 0, -1):
+                j = random.randint(0, i)
+                nA = self.jobNames[i]
+                nB = self.jobNames[j]
+                sA = self.jobStats[nA][stat]
+                sB = self.jobStats[nB][stat]
+                self.jobStats[nA][stat], self.jobStats[nB][stat] = self.jobStats[nB][stat], self.jobStats[nA][stat]
+        ## MAKE FREELANCER ALWAYS 100%
+        self.jobStats['Freelancer'] = {
+            'HP': [100]*14,
+            'MP': [100]*14,
+            'STR': [100]*14,
+            'VIT': [100]*14,
+            'INT': [100]*14,
+            'MND': [100]*14,
+            'AGI': [100]*14,
+            'DEX': [100]*14,
+        }
+
+    def shuffleAbilities(self):
+
+        # Assign support skills to mages first
+        candidates = list(self.supIds)
+        random.shuffle(candidates)
+        for name in self.jobNames:
+            if not self.isSpellCaster[name]: # Skip non-mages
+                continue
+            abilities = self.jobAbil[name]
+            for i, c in enumerate(abilities):
+                if c > 0:
+                    abilities[i] = candidates.pop()
+
+        # Append all non-magic attacks to candidates
+        nonmagic = []
+        for name in self.jobNames:
+            if self.isSpellCaster[name]: # Skip mages
+                continue
+            nonmagic += self.jobAbil[name]
+        nonmagic = sorted(set(nonmagic).difference(self.supIds)) # filter supIds
+        candidates += nonmagic
+        random.shuffle(candidates)
+
+        # Assign abilities to remaining jobs
+        for name in self.jobNames:
+            if self.isSpellCaster[name]: # Skip mages
+                continue
+            abilities = self.jobAbil[name]
+            for i in range(14):
+                self.jobAbil[name][i] = candidates.pop()
+
+        # Map abilities to jobIds
+        abilIdToJob = {}
+        for i, name in enumerate(self.jobNames):
+            for abilId in self.jobAbil[name]:
+                abilIdToJob[abilId] = i
+
+        # Current map of support job Id to support icons
+        supJobIdToIcon = {j:i for j,i in zip(self.supJobIds, self.supIcons)}
+        
+        # Update jobIds and icons for support abilities
+        for i, s in enumerate(self.supIds):
+            if s in abilIdToJob:
+                jobId = abilIdToJob[s]
+                self.supJobIds[i] = jobId
+                self.supIcons[i] = supJobIdToIcon[jobId]
+
+
+    def shuffleSpells(self):
+
+        # LOAD DATA
+        nameToFile = {
+            'Black Mage': 'AbilityBMG.btb',
+            'Spell Fencer': 'AbilityMGS.btb',
+            'Time Mage': 'AbilityTMG.btb',
+            # 'Red Mage': 'AbilityWBM.btb',
+            'White Mage': 'AbilityWMG.btb',
+        }
+        data = {n:{} for n in nameToFile.keys()}
+        for i, (name, fileName) in enumerate(nameToFile.items()):
+            spellsList = self.jobSpells[name]
+            groupIds = list(filter(lambda x: x > 0, spellsList))
+            for i, gId in enumerate(groupIds):
+                data[name][i+1] = {'group':gId, 'spells':[]}
+            # Load ability table
+            level = self.readData(fileName, 0)
+            magId = self.readData(fileName, 1)
+            itemId = self.readData(fileName, 2)
+            x = zip(level, magId, itemId)
+            for lvl, mag, item in x:
+                data[name][lvl]['spells'].append((mag, item))
+
+        # Store vanilla data
+        vanilla = deepcopy(data)
+                
+        mageNames = list(nameToFile.keys())
+        def shuffleGroups(level):
+            for i in range(len(mageNames)-1, 0, -1):
+                mageA = mageNames[i]
+                mageB = random.choice(mageNames[:i])
+                data[mageA][level], data[mageB][level] = data[mageB][level], data[mageA][level]
+
+        while True:
+            shuffleGroups(1)
+            # Ensure white mage has spells that can be bought in Caldisla
+            if data['White Mage'][1]['group'] in [2001, 2009, 2037, 2064]:
+                break
+        shuffleGroups(2)
+        shuffleGroups(3)
+        shuffleGroups(4)
+        shuffleGroups(5)
+        shuffleGroups(6)
+
+        # Write data
+        for name, fileName in nameToFile.items():
+            # Write group IDs
+            lvl = 1
+            for i in range(14):
+                if self.jobSpells[name][i] > 0:
+                    self.jobSpells[name][i] = data[name][lvl]['group']
+                    lvl += 1
+
+            # Write ability tables
+            lst = []
+            for lvl in range(1, 7):
+                lst += data[name][lvl]['spells']
+            spells, items = zip(*lst)
+            self.patchData(spells, fileName, 1)
+            self.patchData(items, fileName, 2)
+        
+        # GET MAPPING FROM OLD<->NEW group
+        oldToNew = {}; newToOld = {}
+        for name in nameToFile.keys():
+            for lvl in range(1,7):
+                old = vanilla[name][lvl]['group']
+                new = data[name][lvl]['group']
+                oldToNew[old] = new
+                newToOld[new] = old
+        
+        for i, ti in enumerate(self.jobTableComId):
+            if ti in oldToNew:
+                self.jobTableComId[i] = oldToNew[ti]
+        labelToIcon = {l:i for l,i in zip(self.jobComLabelId, self.jobComIconId)}
+        for i, ti in enumerate(self.jobComLabelId):
+            if ti in newToOld:
+                self.jobComIconId[i] = labelToIcon[newToOld[ti]]
+
+        for i, comId in enumerate(self.jobComLabelId):
+            if comId in oldToNew:
+                self.patchString('Cast magic.', 'JobCommand.btb', i, 3)
+
+        # UPDATE RED MAGE DESCRIPTIONS
+
+        # get list of white mage + black mages spells / level
+        rm = {}
+        for lvl in range(1, 5):
+            rm[lvl] = []
+            rm[lvl] += data['White Mage'][lvl]['spells']
+            rm[lvl] += data['Black Mage'][lvl]['spells']
+
+        for i, row in enumerate(range(36, 40)):
+            lvl = i+1
+            spellNames = [self.comIdToName[x[0]] for x in rm[lvl]]
+            spellNames[-1] = 'and '+spellNames[-1]
+            string = 'Enables use of\n' + ', '.join(spellNames) + '.'
+            self.patchString(string, 'DetailInfoMagicTable.btb', row, 2)
+        
+        
+
+    def printAbilities(self):
+        # Setup
+        labelIdToLabel = {i:l for i,l in zip(self.jobComLabelId, self.jobComLabels)}
+        supIdToName = {i:n for i,n in zip(self.supIds, self.supNames)}
+        supIdToCost = {i:c for i,c in zip(self.supIds, self.supCosts)}
+        comIdToName = {i:n for i,n in zip(self.comIds, self.comNames)}
+        
+        print('=============')
+        print('JOB ABILITIES')
+        print('=============')
+        print('')
+        print('')
+        jobNames = [ # ORDER TO MATCH MENU
+            'Freelancer', 'Monk', 'White Mage', 'Black Mage', 'Knight', 'Thief', 'Merchant', 'Spell Fencer',
+            'Time Mage', 'Ranger', 'Summoner', 'Valkyrie', 'Red Mage', 'Salve-Maker', 'Performer', 'Pirate',
+            'Ninja', 'Swordmaster', 'Arcanist', 'Spiritmaster','Templar', 'Dark Knight', 'Vampire', 'Conjurer',
+        ]
+        for name in jobNames:
+            print(name)
+            print('-'*len(name))
+            print('')
+            print('  Specialty:', supIdToName[self.jobSpec[name]])
+            print('')
+            print('  Abilities:')
+            for i, (comId, labelId) in enumerate(zip(self.jobAbil[name], self.jobSpells[name])): # REMEMBER: jobSpells also used for job "titles"
+                if comId in comIdToName:
+                    print(f'    {i+1})'.rjust(7, ' '), comIdToName[comId])
+                elif comId in supIdToName:
+                    print(f'    {i+1})'.rjust(7, ' '), supIdToName[comId].ljust(20, ' '), supIdToCost[comId], 'SA')
+                else:
+                    print(f'    {i+1})'.rjust(7, ' '), labelIdToLabel[labelId])
+                    
+            print('')
+            print('')
+        print('')
+        print('')
+        print('')
+        print('')
+        
+
+    def printStats(self):
+        print('====================')
+        print('JOB STAT AFFINITIES')
+        print('====================')
         print('')
         print('')
 
-
+        jobNames = [ # ORDER TO MATCH MENU
+            'Freelancer', 'Monk', 'White Mage', 'Black Mage', 'Knight', 'Thief', 'Merchant', 'Spell Fencer',
+            'Time Mage', 'Ranger', 'Summoner', 'Valkyrie', 'Red Mage', 'Salve-Maker', 'Performer', 'Pirate',
+            'Ninja', 'Swordmaster', 'Arcanist', 'Spiritmaster','Templar', 'Dark Knight', 'Vampire', 'Conjurer',
+        ]
+        statNames = ['HP', 'MP', 'STR', 'VIT', 'INT', 'MND', 'DEX', 'AGI']
+        line = ' '*16
+        for s in statNames:
+            line += s.rjust(6, ' ')
+        print(line)
+        print('')
+        for name in jobNames:
+            line = '  '+name.ljust(14, ' ')
+            stats = list(self.jobStats[name].values())
+            line += f"{stats[0][0]}%".rjust(6, ' ')
+            line += f"{stats[1][0]}%".rjust(6, ' ')
+            line += f"{stats[2][0]}%".rjust(6, ' ')
+            line += f"{stats[3][0]}%".rjust(6, ' ')
+            line += f"{stats[4][0]}%".rjust(6, ' ')
+            line += f"{stats[5][0]}%".rjust(6, ' ')
+            line += f"{stats[7][0]}%".rjust(6, ' ')
+            line += f"{stats[6][0]}%".rjust(6, ' ')
+            print(line)
+        print('')
+        print('')
+            
+        

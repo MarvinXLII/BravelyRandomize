@@ -281,7 +281,7 @@ class GuiApplication:
             self.bottomLabel('Randomizing...done! Good luck!', 'blue', 0)
         except:
             self.clearBottomLabels()
-            self.bottomLabel('Mrgrgrgrgr! Randomizing failed.', 'red', 0)
+            self.bottomLabel('Mrgrgrgrgr!', 'red', 0)
             self.bottomLabel('Randomizing failed.', 'red', 1)
 
 
@@ -296,11 +296,6 @@ def randomize(settings):
     else:
         pwd = os.getcwd()
 
-    outdir = os.path.join(pwd, f"seed_{settings['seed']}")
-    if os.path.isdir(outdir):
-        shutil.rmtree(outdir)
-    os.mkdir(outdir)
-
     #############
     # Randomize #
     #############
@@ -308,6 +303,17 @@ def randomize(settings):
     rom = ROM(settings)
     rom.randomize()
     rom.qualityOfLife()
+    rom.patch()
+
+    ##########
+    # Output #
+    ##########
+    
+    outdir = os.path.join(pwd, f"seed_{settings['seed']}")
+    if os.path.isdir(outdir):
+        shutil.rmtree(outdir)
+    os.mkdir(outdir)
+
     rom.printLogs(outdir)
     rom.write(outdir)
 
@@ -315,7 +321,8 @@ def randomize(settings):
     # Dump Settings #
     #################
 
-    with open(f"{outdir}/settings.json", 'w') as file:
+    filename = os.path.join(outdir, 'settings.json')
+    with open(filename, 'w') as file:
         hjson.dump(settings, file)
 
 
