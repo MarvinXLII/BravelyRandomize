@@ -111,7 +111,7 @@ class ROM:
         temp = sys.stdout
         sys.stdout = open(os.path.join(path, 'spoiler.log'), 'w')
         self.jobs.printStats()
-        self.jobs.printMagics()
+        # self.jobs.printMagics()
         self.jobs.printAbilities()
         self.treasures.print()
         sys.stdout = temp
@@ -323,8 +323,10 @@ class JOBS:
         # Load command titles
         self.commandTitles = self.paramater.crowd['JobCommand.btb']['names'][::2]
         self.commandTitleId = self.paramater.readData('JobCommand.btb', 0)
+        self.commandIconId = self.paramater.readData('JobCommand.btb', 4)
         self.titleIdToTitle = {i:t for i,t in zip(self.commandTitleId, self.commandTitles)}
         self.titleIdToTitle[0] = None
+        self.titleIdToIcon = {t:i for t, i in zip(self.commandTitleId, self.commandIconId)}
         
         # Load all job commands and stats
         self.jobStats = {}
@@ -429,166 +431,226 @@ class JOBS:
 
     # OMIT SUMMONS
     def shuffleSpells(self):
-        wm = self.mageSpells['White Mage']
-        bm = self.mageSpells['Black Mage']
-        tm = self.mageSpells['Time Mage']
-        sf = self.mageSpells['Spell Fencer']
-        rm = self.mageSpells['Red Mage']
-        prevItems = [self.spellIdToItem[i] for i in wm + bm + tm]
-        
-        ########################
-        # Assign spells groups #
-        ########################
 
-        slots = {
-            'White Mage': [True]*18,
-            'Black Mage': [True]*18,
-            'Time Mage': [True]*18,
-        }
-        candidates = wm + bm + tm
+        mageFiles = []
+        mageNames = []
+        mageTitles = []
+        for jobName, subFile in zip(self.jobNames, self.jobFiles):
+            if self.isSpellCaster[jobName]:
+                mageFiles.append(subFile)
+                mageNames.append(jobName)
+                mageTitles.append(self.jobTitles[jobName])
+        magicByJob = [list(filter(lambda x: x > 0, m)) for m in mageTitles]
 
-        def assignGroupToMage(group):
-            spellIds = [self.comNameToId[i] for i in group]
-            # Pick a mage with enough vacant slots
-            mage, weights = random.sample(list(slots.items()), 1)[0]
-            while sum(weights) <= len(group): # redo if not enough vacant slots
-                mage, weights = random.sample(list(slots.items()), 1)[0]
-            # Pick 3 unique slots
-            idx = set([])
-            while len(idx) < len(group):
-                idx.add( random.choices(population=range(18), weights=weights)[0] )
-            # Assign spells to these slots
-            idx = sorted(idx)
-            for i in idx:
-                weights[i] = False
-                spell = spellIds.pop(0)
-                self.mageSpells[mage][i] = spell
-                candidates.remove(spell)
+        # Shuffle levels first
+        for magic in magicByJob:
+            random.shuffle(magic)
 
-        groups = [
-            ['Cure', 'Cura', 'Curaga'],
-            ['Raise','Arise'],
-            ['Blindna', 'Poisona', 'Esuna','Esunaga'],
-            ['Aero','Aerora', 'Aeroga'],
-            ['Shell','Reflect'],
-            ['Fire','Fira','Firaga'],
-            ['Blizzard','Blizzara','Blizzaga'],
-            ['Thunder','Thundara','Thundaga'],
-            ['Quake','Quara','Quaga'],
-            ['Slow','Slowga'],
-            ['Haste','Hastega'],
-            ['Veil','Veilga'],
-            ['Gravity','Graviga'],
-            ['Regen','Reraise'],
-            ['Comet', 'Meteor']
-        ]
-        random.shuffle(groups)
-        for group in groups:
-            assignGroupToMage(group)
-
-        # Assign remaining spells
-        random.shuffle(candidates)
-        for mage, weights in slots.items():
-            for i, w in enumerate(weights):
-                if not w: continue # Slot already replaced
-                self.mageSpells[mage][i] = candidates.pop()
-
-        # Shuffle SpellFencer 
-        # THIS IS EXTREMELY BIASED. NOT SURE HOW TO DO IT WELL
-        # Done like this to ensure Fire < Fira < Firaga.
-        for i in range(17, 0, -1):
-            minval = (i // 6) * 6
-            j = random.randint(minval, i)
-            sf[i], sf[j] = sf[j], sf[i]
-
-        # Red Mage
-        rm[:12] = wm[:12]
-        rm[12:] = bm[:12]
-
-        # Patch spells and items
-        for name, subFile in zip(self.mageNames, self.mageSubFiles):
-            spells = self.mageSpells[name]
-            items = [self.spellIdToItem[i] for i in spells]
-            self.paramater.patchData(spells, subFile, 1)
-            self.paramater.patchData(items, subFile, 2)
-
-        ###########################
-        # Patch mage descriptions #
-        ###########################
-
-        def getString(spellIds):
-            nameList = [self.comIdToName[i] for i in spellIds]
-            nameList[-1] = 'and ' + nameList[-1]
-            if len(nameList) > 4:
-                nameList[3] = '\n' + nameList[3]
-            return 'Enables use of\n' + ', '.join(nameList) + '.'
-        
-        # White mage
-        spells = self.mageSpells['White Mage']
-        spellNames = [self.comIdToName[i] for i in spells]
+        # Shuffle across jobs at each level
         for i in range(6):
-            string = getString(spells[i*3:(i+1)*3])
-            self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', i, 2)
+            level = []
+            for m in magicByJob:
+                if i < len(m): # Only 4 entries for Red Mage
+                    level.append(m[i])
+            random.shuffle(level)
+            for m in magicByJob:
+                if i < len(m):
+                    m[i] = level.pop()
+                
+        # Update self.jobTitles via mageTitles
+        oldToNewCommand = {}
+        for i, name in enumerate(mageNames):
+            titles = mageTitles[i]
+            magicLevels = magicByJob[i]
+            for i, ti in enumerate(titles):
+                if ti > 0:
+                    # titles[i] = magicLevels.pop(0)
+                    old = titles[i]
+                    new = magicLevels.pop(0)
+                    oldToNewCommand[old] = new
+                    titles[i] = new
 
-        # Black Mage
-        spells = self.mageSpells['Black Mage']
-        spellNames = [self.comIdToName[i] for i in spells]
-        for i, row in enumerate(range(6, 12)):
-            string = getString(spells[i*3:(i+1)*3])
-            self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
+        # Patch titles
+        for name, subFile in zip(mageNames, mageFiles):
+            self.paramater.patchData(self.jobTitles[name], subFile, 16)
 
-        # Time Mage
-        spells = self.mageSpells['Time Mage']
-        spellNames = [self.comIdToName[i] for i in spells]
-        for i, row in enumerate(range(12, 18)):
-            string = getString(spells[i*3:(i+1)*3])
-            self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
+        # Update title descriptions ?????????????
+        commands = self.paramater.readData('JobTable.btb', 4)
+        newToOldCommand = {n:o for o, n in oldToNewCommand.items()}
+        for i, ti in enumerate(commands):
+            if ti in oldToNewCommand:
+                commands[i] = oldToNewCommand[ti]
+        for i, ti in enumerate(self.commandTitleId):
+            if ti in newToOldCommand:
+                self.commandIconId[i] = self.titleIdToIcon[newToOldCommand[ti]]
+        self.paramater.patchData(commands, 'JobTable.btb', 4)
+        self.paramater.patchData(self.commandIconId, 'JobCommand.btb', 4)
 
-        # Spell Fencer
-        spells = self.mageSpells['Spell Fencer']
-        spellNames = [self.comIdToName[i] for i in spells]
-        for i, row in enumerate(range(19, 25)):
-            string = getString(spells[i*3:(i+1)*3])
-            self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
-
-        # Red Mage
-        spells = self.mageSpells['Red Mage']
-        spellNames = [self.comIdToName[i] for i in spells]
-        for i, row in enumerate(range(36, 40)):
-            w = spells[i*3:(i+1)*3]
-            b = spells[12+i*3:12+(i-1)*3]
-            string = getString(w+b)
-            self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
-
-        ####################
-        # Patch item icons #
-        ####################
-
-        itemId = self.paramater.readData('ItemTable.btb', 0, row=486, numEntries=101)
-        icons = self.paramater.readData('ItemTable.btb', 11, row=486, numEntries=101)
-        prevToIcon = {p:i for p, i in zip(itemId, icons)}
+        # Overwrite all magic command strings
+        for i, comId in enumerate(self.commandTitleId):
+            if comId in oldToNewCommand: # Check if it is a magic/summon command
+                self.paramater.patchNameString('Cast magic/summons.', 'JobCommand.btb', i, 3)
         
-        newItems = [self.spellIdToItem[i] for i in wm + bm + tm]
-        newToPrev = {n:p for n, p in zip(newItems, prevItems)}
-        prevToNew = {p:n for n, p in zip(newItems, prevItems)}
+        # wm = self.mageSpells['White Mage']
+        # bm = self.mageSpells['Black Mage']
+        # tm = self.mageSpells['Time Mage']
+        # sf = self.mageSpells['Spell Fencer']
+        # rm = self.mageSpells['Red Mage']
+        # prevItems = [self.spellIdToItem[i] for i in wm + bm + tm]
+        
+        # ########################
+        # # Assign spells groups #
+        # ########################
 
-        newIcons = []
-        for i in itemId:
-            if i in newToPrev:
-                newIcons.append(prevToIcon[newToPrev[i]])
-            else:
-                newIcons.append(prevToIcon[i])
-        self.paramater.patchData(newIcons, 'ItemTable.btb', 11, row=486)
+        # slots = {
+        #     'White Mage': [True]*18,
+        #     'Black Mage': [True]*18,
+        #     'Time Mage': [True]*18,
+        # }
+        # candidates = wm + bm + tm
 
-        ###############
-        # Update shop #
-        ###############
+        # def assignGroupToMage(group):
+        #     spellIds = [self.comNameToId[i] for i in group]
+        #     # Pick a mage with enough vacant slots
+        #     mage, weights = random.sample(list(slots.items()), 1)[0]
+        #     while sum(weights) <= len(group): # redo if not enough vacant slots
+        #         mage, weights = random.sample(list(slots.items()), 1)[0]
+        #     # Pick 3 unique slots
+        #     idx = set([])
+        #     while len(idx) < len(group):
+        #         idx.add( random.choices(population=range(18), weights=weights)[0] )
+        #     # Assign spells to these slots
+        #     idx = sorted(idx)
+        #     for i in idx:
+        #         weights[i] = False
+        #         spell = spellIds.pop(0)
+        #         self.mageSpells[mage][i] = spell
+        #         candidates.remove(spell)
 
-        for shopFile in self.shopMagicFiles:
-            items = self.shops.readData(shopFile, 0)
-            newItems = [prevToNew[i] for i in items]
-            random.shuffle(newItems)
-            self.shops.patchData(newItems, shopFile, 0)
+        # groups = [
+        #     ['Cure', 'Cura', 'Curaga'],
+        #     ['Raise','Arise'],
+        #     ['Blindna', 'Poisona', 'Esuna','Esunaga'],
+        #     ['Aero','Aerora', 'Aeroga'],
+        #     ['Shell','Reflect'],
+        #     ['Fire','Fira','Firaga'],
+        #     ['Blizzard','Blizzara','Blizzaga'],
+        #     ['Thunder','Thundara','Thundaga'],
+        #     ['Quake','Quara','Quaga'],
+        #     ['Slow','Slowga'],
+        #     ['Haste','Hastega'],
+        #     ['Veil','Veilga'],
+        #     ['Gravity','Graviga'],
+        #     ['Regen','Reraise'],
+        #     ['Comet', 'Meteor']
+        # ]
+        # random.shuffle(groups)
+        # for group in groups:
+        #     assignGroupToMage(group)
+
+        # # Assign remaining spells
+        # random.shuffle(candidates)
+        # for mage, weights in slots.items():
+        #     for i, w in enumerate(weights):
+        #         if not w: continue # Slot already replaced
+        #         self.mageSpells[mage][i] = candidates.pop()
+
+        # # Shuffle SpellFencer 
+        # # THIS IS EXTREMELY BIASED. NOT SURE HOW TO DO IT WELL
+        # # Done like this to ensure Fire < Fira < Firaga.
+        # for i in range(17, 0, -1):
+        #     minval = (i // 6) * 6
+        #     j = random.randint(minval, i)
+        #     sf[i], sf[j] = sf[j], sf[i]
+
+        # # Red Mage
+        # rm[:12] = wm[:12]
+        # rm[12:] = bm[:12]
+
+        # # Patch spells and items
+        # for name, subFile in zip(self.mageNames, self.mageSubFiles):
+        #     spells = self.mageSpells[name]
+        #     items = [self.spellIdToItem[i] for i in spells]
+        #     self.paramater.patchData(spells, subFile, 1)
+        #     self.paramater.patchData(items, subFile, 2)
+
+        # ###########################
+        # # Patch mage descriptions #
+        # ###########################
+
+        # def getString(spellIds):
+        #     nameList = [self.comIdToName[i] for i in spellIds]
+        #     nameList[-1] = 'and ' + nameList[-1]
+        #     if len(nameList) > 4:
+        #         nameList[3] = '\n' + nameList[3]
+        #     return 'Enables use of\n' + ', '.join(nameList) + '.'
+        
+        # # White mage
+        # spells = self.mageSpells['White Mage']
+        # spellNames = [self.comIdToName[i] for i in spells]
+        # for i in range(6):
+        #     string = getString(spells[i*3:(i+1)*3])
+        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', i, 2)
+
+        # # Black Mage
+        # spells = self.mageSpells['Black Mage']
+        # spellNames = [self.comIdToName[i] for i in spells]
+        # for i, row in enumerate(range(6, 12)):
+        #     string = getString(spells[i*3:(i+1)*3])
+        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
+
+        # # Time Mage
+        # spells = self.mageSpells['Time Mage']
+        # spellNames = [self.comIdToName[i] for i in spells]
+        # for i, row in enumerate(range(12, 18)):
+        #     string = getString(spells[i*3:(i+1)*3])
+        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
+
+        # # Spell Fencer
+        # spells = self.mageSpells['Spell Fencer']
+        # spellNames = [self.comIdToName[i] for i in spells]
+        # for i, row in enumerate(range(19, 25)):
+        #     string = getString(spells[i*3:(i+1)*3])
+        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
+
+        # # Red Mage
+        # spells = self.mageSpells['Red Mage']
+        # spellNames = [self.comIdToName[i] for i in spells]
+        # for i, row in enumerate(range(36, 40)):
+        #     w = spells[i*3:(i+1)*3]
+        #     b = spells[12+i*3:12+(i-1)*3]
+        #     string = getString(w+b)
+        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
+
+        # ####################
+        # # Patch item icons #
+        # ####################
+
+        # itemId = self.paramater.readData('ItemTable.btb', 0, row=486, numEntries=101)
+        # icons = self.paramater.readData('ItemTable.btb', 11, row=486, numEntries=101)
+        # prevToIcon = {p:i for p, i in zip(itemId, icons)}
+        
+        # newItems = [self.spellIdToItem[i] for i in wm + bm + tm]
+        # newToPrev = {n:p for n, p in zip(newItems, prevItems)}
+        # prevToNew = {p:n for n, p in zip(newItems, prevItems)}
+
+        # newIcons = []
+        # for i in itemId:
+        #     if i in newToPrev:
+        #         newIcons.append(prevToIcon[newToPrev[i]])
+        #     else:
+        #         newIcons.append(prevToIcon[i])
+        # self.paramater.patchData(newIcons, 'ItemTable.btb', 11, row=486)
+
+        # ###############
+        # # Update shop #
+        # ###############
+
+        # for shopFile in self.shopMagicFiles:
+        #     items = self.shops.readData(shopFile, 0)
+        #     newItems = [prevToNew[i] for i in items]
+        #     random.shuffle(newItems)
+        #     self.shops.patchData(newItems, shopFile, 0)
         
 
     def randomSpecialty(self):
@@ -652,9 +714,9 @@ class JOBS:
 
 
     def printStats(self):
-        print('=========')
-        print('JOB STATS')
-        print('=========')
+        print('====================')
+        print('JOB STAT AFFINITIES')
+        print('====================')
         print('')
         print('')
 

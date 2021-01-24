@@ -10,7 +10,7 @@ Several options are available:
 
 - Random job specialties
 
-- Shuffle job stats
+- Shuffle job stats ("affinities")
 
 - Shuffle treasure chests and hidden items
 
