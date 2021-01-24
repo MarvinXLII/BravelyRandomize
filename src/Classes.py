@@ -130,6 +130,112 @@ class ROM:
         writeFile(self.shopCrowd)
         writeFile(self.battleCrowd)
 
+
+
+# The main purpose of this class is to FIND address of data
+# and help me view data as a table (i.e. rows and columns)
+class DATA:
+    def __init__(self, indexFileObj, crowdFileObj):
+        self.indexFileObj = indexFileObj
+        self.crowdFileObj = crowdFileObj
+        self.index = {}
+        self.crowd = {}
+        self.subFileToBase = {}
+
+        # JUST NEED OFFSETS FROM INDEX
+        self.indexFileObj.address = 0
+        indexOffset = self.indexFileObj.read()
+        while True:
+            base = self.indexFileObj.read()
+            size = self.indexFileObj.read()
+            stringCRC32 = self.indexFileObj.read()
+            subFileName = self.indexFileObj.readString()
+            self.subFileToBase[subFileName] = base
+            if indexOffset == 0:
+                break
+            self.indexFileObj.address = indexOffset
+            indexOffset = self.indexFileObj.read()
+
+        for subFileName, base in self.subFileToBase.items():
+            self.crowdFileObj.address = base + 8
+            self.crowd[subFileName] = {}
+            self.crowd[subFileName]['dataAddress'] = base + self.crowdFileObj.read()
+            self.crowd[subFileName]['dataSize'] = self.crowdFileObj.read()
+            # "Commands" for each row of table
+            self.crowd[subFileName]['commandAddress'] = base + self.crowdFileObj.read()
+            self.crowd[subFileName]['commandSize'] = self.crowdFileObj.read()
+            # Both names and descriptions
+            self.crowd[subFileName]['stringAddress'] = base + self.crowdFileObj.read()
+            self.crowd[subFileName]['stringSize'] = self.crowdFileObj.read()
+            # Entry data
+            self.crowd[subFileName]['stride'] = self.crowdFileObj.read()
+            self.crowd[subFileName]['number'] = self.crowdFileObj.read()
+            # Load commands
+            if self.crowd[subFileName]['commandSize'] > 0:
+                self.crowd[subFileName]['commands'] = []
+                self.crowdFileObj.address = self.crowd[subFileName]['commandAddress']
+                while self.crowdFileObj.address < self.crowd[subFileName]['commandAddress'] + self.crowd[subFileName]['commandSize']:
+                    string = self.crowdFileObj.readString()
+                    self.crowd[subFileName]['commands'].append(string)
+            # Load strings and decriptions
+            if self.crowd[subFileName]['stringSize'] > 0:
+                self.crowd[subFileName]['strings'] = []
+                self.crowdFileObj.address = self.crowd[subFileName]['stringAddress']
+                while self.crowdFileObj.address < self.crowd[subFileName]['stringAddress'] + self.crowd[subFileName]['stringSize']:
+                    string = self.crowdFileObj.readString(size=2)
+                    self.crowd[subFileName]['strings'].append(string)
+
+                
+    def getAddress(self, key, row, col):
+        base = self.crowd[key]['dataAddress']
+        stride = self.crowd[key]['stride']
+        offset = col*4 + stride*row
+        return base + offset
+                    
+    # Read a single value of data
+    def readValue(self, key, row, col):
+        address = self.getAddress(key, row, col)
+        return self.crowdFileObj.readValue(address)
+    
+    # Read a "column" of data
+    def readData(self, key, col, row=None, rowCommand=None, numEntries=None):
+        # Identify which row to start from
+        if rowCommand:
+            row = self.crowd[key]['commands'].index(rowCommand)
+        elif not row:
+            row = 0
+        # Identify number of entries to read (i.e. how many rows to read from)
+        if not numEntries:
+            numEntries = self.crowd[key]['number']
+        numEntries = min(numEntries, self.crowd[key]['number'])
+        # Read column of data
+        address = self.getAddress(key, row, col)
+        stride = self.crowd[key]['stride']
+        return self.crowdFileObj.readArray(address, numEntries, stride)
+        
+    # Patch a single value of data
+    def patchValue(self, value, key, row, col):
+        address = self.getAddress(key, row, col)
+        self.crowdFileObj.patch(value, address)
+
+    def patchData(self, data, key, col, row=None, rowCommand=None):
+        # Identify which row to start from
+        if rowCommand:
+            row = self.crowd[key]['commands'].index(rowCommand)
+        elif not row:
+            row = 0
+        # Patch column of data
+        address = self.getAddress(key, row, col)
+        stride = self.crowd[key]['stride']
+        self.crowdFileObj.patchArray(data, address, stride)
+
+    # row and col denote offset
+    def patchString(self, string, key, row, col):
+        offset = self.readValue(key, row, col)
+        base = self.crowd[key]['stringAddress']
+        self.crowdFileObj.patchString(string, base+offset, size=2)
+
+
 class ENEMIES:
     def __init__(self, battle):
         self.battle = battle
@@ -176,121 +282,21 @@ class PCS:
             self.paramater.patchData(exp, subFile, 2)
         
 
-# The main purpose of this class is to FIND address of data
-# and help me view data as a table (i.e. rows and columns)
-class DATA:
-    def __init__(self, indexFileObj, crowdFileObj):
-        self.indexFileObj = indexFileObj
-        self.crowdFileObj = crowdFileObj
-        self.index = {}
-        self.crowd = {}
-        self.subFileToBase = {}
-
-        # JUST NEED OFFSETS FROM INDEX
-        self.indexFileObj.address = 0
-        indexOffset = self.indexFileObj.read()
-        while True:
-            base = self.indexFileObj.read()
-            size = self.indexFileObj.read()
-            stringCRC32 = self.indexFileObj.read()
-            subFileName = self.indexFileObj.readString()
-            self.subFileToBase[subFileName] = base
-            if indexOffset == 0:
-                break
-            self.indexFileObj.address = indexOffset
-            indexOffset = self.indexFileObj.read()
-
-        for subFileName, base in self.subFileToBase.items():
-            self.crowdFileObj.address = base + 8
-            self.crowd[subFileName] = {}
-            self.crowd[subFileName]['dataAddress'] = base + self.crowdFileObj.read()
-            self.crowd[subFileName]['dataSize'] = self.crowdFileObj.read()
-            # Labels for each row of table
-            self.crowd[subFileName]['labelAddress'] = base + self.crowdFileObj.read()
-            self.crowd[subFileName]['labelSize'] = self.crowdFileObj.read()
-            # Both names and descriptions
-            self.crowd[subFileName]['nameAddress'] = base + self.crowdFileObj.read()
-            self.crowd[subFileName]['nameSize'] = self.crowdFileObj.read()
-            # Entry data
-            self.crowd[subFileName]['stride'] = self.crowdFileObj.read()
-            self.crowd[subFileName]['number'] = self.crowdFileObj.read()
-            # Load labels
-            if self.crowd[subFileName]['labelSize'] > 0:
-                self.crowd[subFileName]['labels'] = []
-                self.crowdFileObj.address = self.crowd[subFileName]['labelAddress']
-                while self.crowdFileObj.address < self.crowd[subFileName]['labelAddress'] + self.crowd[subFileName]['labelSize']:
-                    string = self.crowdFileObj.readString()
-                    self.crowd[subFileName]['labels'].append(string)
-            # Load names and decriptions
-            if self.crowd[subFileName]['nameSize'] > 0:
-                self.crowd[subFileName]['names'] = []
-                self.crowdFileObj.address = self.crowd[subFileName]['nameAddress']
-                while self.crowdFileObj.address < self.crowd[subFileName]['nameAddress'] + self.crowd[subFileName]['nameSize']:
-                    string = self.crowdFileObj.readString(size=2)
-                    self.crowd[subFileName]['names'].append(string)
-
-                
-    def getAddress(self, key, row, col):
-        base = self.crowd[key]['dataAddress']
-        stride = self.crowd[key]['stride']
-        offset = col*4 + stride*row
-        return base + offset
-                    
-    # Read a single value of data
-    def readValue(self, key, row, col):
-        address = self.getAddress(key, row, col)
-        return self.crowdFileObj.readValue(address)
-    
-    # Read a "column" of data
-    def readData(self, key, col, row=None, rowLabel=None, numEntries=None):
-        # Identify which row to start from
-        if rowLabel:
-            row = self.crowd[key]['labels'].index(rowLabel)
-        elif not row:
-            row = 0
-        # Identify number of entries to read (i.e. how many rows to read from)
-        if not numEntries:
-            numEntries = self.crowd[key]['number']
-        numEntries = min(numEntries, self.crowd[key]['number'])
-        # Read column of data
-        address = self.getAddress(key, row, col)
-        stride = self.crowd[key]['stride']
-        return self.crowdFileObj.readArray(address, numEntries, stride)
-        
-    # Patch a single value of data
-    def patchValue(self, value, key, row, col):
-        address = self.getAddress(key, row, col)
-        self.crowdFileObj.patch(value, address)
-
-    def patchData(self, data, key, col, row=None, rowLabel=None):
-        # Identify which row to start from
-        if rowLabel:
-            row = self.crowd[key]['labels'].index(rowLabel)
-        elif not row:
-            row = 0
-        # Patch column of data
-        address = self.getAddress(key, row, col)
-        stride = self.crowd[key]['stride']
-        self.crowdFileObj.patchArray(data, address, stride)
-
-    # row and col denote offset
-    def patchNameString(self, string, key, row, col):
-        offset = self.readValue(key, row, col)
-        base = self.crowd[key]['nameAddress']
-        self.crowdFileObj.patchString(string, base+offset, size=2)
-
-
 class JOBS:
+    ## LOAD ALL DATA THAT WILL BE MODIFIED/PATCHED
+    ## CONSIDER DATA THAT IS GAME-SPECIFIC (DIFFERENT COLUMN IN BS???)
     def __init__(self, paramater, shops):
         self.paramater = paramater
         self.shops = shops
         self.jobFiles = []
+
+        # SPECIFY LISTS OF STRINGS NEEDED (THAT CANNOT BE READ FOR VARIOUS REASONS)
         for i in range(24):
             j = str(i).rjust(2, '0')
             self.jobFiles.append(f'JobTable{j}.btb')
-        self.shopMagicFiles = filter(lambda x: 'TW' in x, self.shops.subFileToBase.keys())
-        self.shopMagicFiles = filter(lambda x: 'Magic' in x, self.shopMagicFiles)
-        self.shopMagicFiles = list(filter(lambda x: '99' not in x, self.shopMagicFiles))
+        # self.shopMagicFiles = filter(lambda x: 'TW' in x, self.shops.subFileToBase.keys())
+        # self.shopMagicFiles = filter(lambda x: 'Magic' in x, self.shopMagicFiles)
+        # self.shopMagicFiles = list(filter(lambda x: '99' not in x, self.shopMagicFiles))
         
         self.jobNames = [
             'Freelancer', 'Knight', 'Black Mage', 'White Mage', 'Monk', 'Ranger',
@@ -302,26 +308,30 @@ class JOBS:
         # List mage subfiles
         self.mageNames = ['Black Mage', 'Spell Fencer', 'Summoner', 'Conjurer',
                           'Time Mage', 'Red Mage', 'White Mage']
-        self.mageSubFiles = ['AbilityBMG.btb', 'AbilityMGS.btb', 'AbilitySMG.btb','AbilitySMU.btb',
-                         'AbilityTMG.btb','AbilityWBM.btb','AbilityWMG.btb']
+        # self.mageSubFiles = ['AbilityBMG.btb', 'AbilityMGS.btb', 'AbilitySMG.btb','AbilitySMU.btb',
+        #                  'AbilityTMG.btb','AbilityWBM.btb','AbilityWMG.btb']
 
+
+        # LOAD VARIOUS COLUMNS OF DATA TO BE MODIFIED & PATCHED
+
+        
         # Load all abilities
         self.commandIds = self.paramater.readData('CommandAbility.btb', 0)
-        self.commandNames = self.paramater.crowd['CommandAbility.btb']['names'][::2]
+        self.commandNames = self.paramater.crowd['CommandAbility.btb']['strings'][::2]
         self.comIdToName = {i:n for n, i in zip(self.commandNames, self.commandIds)} # ID TO NAME IS UNIQUE
         self.comIdToName[361] = 'Genome Ability'
         for i in range(75, 94): # add SF to SpellFencer names
             self.comIdToName[i] = self.comIdToName[i] + '*'
         self.comNameToId = {n:i for i,n in self.comIdToName.items()}
         self.supportIds = self.paramater.readData('SupportAbility.btb', 0)
-        self.supportNames = self.paramater.crowd['SupportAbility.btb']['names'][::2]
+        self.supportNames = self.paramater.crowd['SupportAbility.btb']['strings'][::2]
         self.supNameToId = {n:i for n, i in zip(self.supportNames, self.supportIds)}
         self.supIdToName = {i:n for n, i in zip(self.supportNames, self.supportIds)}
         self.supportCosts = self.paramater.readData('SupportAbility.btb', 5)
         self.supIdToCosts = {i:c for i, c in zip(self.supportIds, self.supportCosts)}
 
         # Load command titles
-        self.commandTitles = self.paramater.crowd['JobCommand.btb']['names'][::2]
+        self.commandTitles = self.paramater.crowd['JobCommand.btb']['strings'][::2]
         self.commandTitleId = self.paramater.readData('JobCommand.btb', 0)
         self.commandIconId = self.paramater.readData('JobCommand.btb', 4)
         self.titleIdToTitle = {i:t for i,t in zip(self.commandTitleId, self.commandTitles)}
@@ -489,168 +499,7 @@ class JOBS:
         # Overwrite all magic command strings
         for i, comId in enumerate(self.commandTitleId):
             if comId in oldToNewCommand: # Check if it is a magic/summon command
-                self.paramater.patchNameString('Cast magic/summons.', 'JobCommand.btb', i, 3)
-        
-        # wm = self.mageSpells['White Mage']
-        # bm = self.mageSpells['Black Mage']
-        # tm = self.mageSpells['Time Mage']
-        # sf = self.mageSpells['Spell Fencer']
-        # rm = self.mageSpells['Red Mage']
-        # prevItems = [self.spellIdToItem[i] for i in wm + bm + tm]
-        
-        # ########################
-        # # Assign spells groups #
-        # ########################
-
-        # slots = {
-        #     'White Mage': [True]*18,
-        #     'Black Mage': [True]*18,
-        #     'Time Mage': [True]*18,
-        # }
-        # candidates = wm + bm + tm
-
-        # def assignGroupToMage(group):
-        #     spellIds = [self.comNameToId[i] for i in group]
-        #     # Pick a mage with enough vacant slots
-        #     mage, weights = random.sample(list(slots.items()), 1)[0]
-        #     while sum(weights) <= len(group): # redo if not enough vacant slots
-        #         mage, weights = random.sample(list(slots.items()), 1)[0]
-        #     # Pick 3 unique slots
-        #     idx = set([])
-        #     while len(idx) < len(group):
-        #         idx.add( random.choices(population=range(18), weights=weights)[0] )
-        #     # Assign spells to these slots
-        #     idx = sorted(idx)
-        #     for i in idx:
-        #         weights[i] = False
-        #         spell = spellIds.pop(0)
-        #         self.mageSpells[mage][i] = spell
-        #         candidates.remove(spell)
-
-        # groups = [
-        #     ['Cure', 'Cura', 'Curaga'],
-        #     ['Raise','Arise'],
-        #     ['Blindna', 'Poisona', 'Esuna','Esunaga'],
-        #     ['Aero','Aerora', 'Aeroga'],
-        #     ['Shell','Reflect'],
-        #     ['Fire','Fira','Firaga'],
-        #     ['Blizzard','Blizzara','Blizzaga'],
-        #     ['Thunder','Thundara','Thundaga'],
-        #     ['Quake','Quara','Quaga'],
-        #     ['Slow','Slowga'],
-        #     ['Haste','Hastega'],
-        #     ['Veil','Veilga'],
-        #     ['Gravity','Graviga'],
-        #     ['Regen','Reraise'],
-        #     ['Comet', 'Meteor']
-        # ]
-        # random.shuffle(groups)
-        # for group in groups:
-        #     assignGroupToMage(group)
-
-        # # Assign remaining spells
-        # random.shuffle(candidates)
-        # for mage, weights in slots.items():
-        #     for i, w in enumerate(weights):
-        #         if not w: continue # Slot already replaced
-        #         self.mageSpells[mage][i] = candidates.pop()
-
-        # # Shuffle SpellFencer 
-        # # THIS IS EXTREMELY BIASED. NOT SURE HOW TO DO IT WELL
-        # # Done like this to ensure Fire < Fira < Firaga.
-        # for i in range(17, 0, -1):
-        #     minval = (i // 6) * 6
-        #     j = random.randint(minval, i)
-        #     sf[i], sf[j] = sf[j], sf[i]
-
-        # # Red Mage
-        # rm[:12] = wm[:12]
-        # rm[12:] = bm[:12]
-
-        # # Patch spells and items
-        # for name, subFile in zip(self.mageNames, self.mageSubFiles):
-        #     spells = self.mageSpells[name]
-        #     items = [self.spellIdToItem[i] for i in spells]
-        #     self.paramater.patchData(spells, subFile, 1)
-        #     self.paramater.patchData(items, subFile, 2)
-
-        # ###########################
-        # # Patch mage descriptions #
-        # ###########################
-
-        # def getString(spellIds):
-        #     nameList = [self.comIdToName[i] for i in spellIds]
-        #     nameList[-1] = 'and ' + nameList[-1]
-        #     if len(nameList) > 4:
-        #         nameList[3] = '\n' + nameList[3]
-        #     return 'Enables use of\n' + ', '.join(nameList) + '.'
-        
-        # # White mage
-        # spells = self.mageSpells['White Mage']
-        # spellNames = [self.comIdToName[i] for i in spells]
-        # for i in range(6):
-        #     string = getString(spells[i*3:(i+1)*3])
-        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', i, 2)
-
-        # # Black Mage
-        # spells = self.mageSpells['Black Mage']
-        # spellNames = [self.comIdToName[i] for i in spells]
-        # for i, row in enumerate(range(6, 12)):
-        #     string = getString(spells[i*3:(i+1)*3])
-        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
-
-        # # Time Mage
-        # spells = self.mageSpells['Time Mage']
-        # spellNames = [self.comIdToName[i] for i in spells]
-        # for i, row in enumerate(range(12, 18)):
-        #     string = getString(spells[i*3:(i+1)*3])
-        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
-
-        # # Spell Fencer
-        # spells = self.mageSpells['Spell Fencer']
-        # spellNames = [self.comIdToName[i] for i in spells]
-        # for i, row in enumerate(range(19, 25)):
-        #     string = getString(spells[i*3:(i+1)*3])
-        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
-
-        # # Red Mage
-        # spells = self.mageSpells['Red Mage']
-        # spellNames = [self.comIdToName[i] for i in spells]
-        # for i, row in enumerate(range(36, 40)):
-        #     w = spells[i*3:(i+1)*3]
-        #     b = spells[12+i*3:12+(i-1)*3]
-        #     string = getString(w+b)
-        #     self.paramater.patchNameString(string, 'DetailInfoMagicTable.btb', row, 2)
-
-        # ####################
-        # # Patch item icons #
-        # ####################
-
-        # itemId = self.paramater.readData('ItemTable.btb', 0, row=486, numEntries=101)
-        # icons = self.paramater.readData('ItemTable.btb', 11, row=486, numEntries=101)
-        # prevToIcon = {p:i for p, i in zip(itemId, icons)}
-        
-        # newItems = [self.spellIdToItem[i] for i in wm + bm + tm]
-        # newToPrev = {n:p for n, p in zip(newItems, prevItems)}
-        # prevToNew = {p:n for n, p in zip(newItems, prevItems)}
-
-        # newIcons = []
-        # for i in itemId:
-        #     if i in newToPrev:
-        #         newIcons.append(prevToIcon[newToPrev[i]])
-        #     else:
-        #         newIcons.append(prevToIcon[i])
-        # self.paramater.patchData(newIcons, 'ItemTable.btb', 11, row=486)
-
-        # ###############
-        # # Update shop #
-        # ###############
-
-        # for shopFile in self.shopMagicFiles:
-        #     items = self.shops.readData(shopFile, 0)
-        #     newItems = [prevToNew[i] for i in items]
-        #     random.shuffle(newItems)
-        #     self.shops.patchData(newItems, shopFile, 0)
+                self.paramater.patchString('Cast magic/summons.', 'JobCommand.btb', i, 3)
         
 
     def randomSpecialty(self):
@@ -812,7 +661,7 @@ class TREASURES:
         # Misc stuff needed
         # -- isDummy dict to map ID to bool (use for filtering allExcluded)
         itemIds = self.paramater.readData('ItemTable.btb', 0)
-        itemNames = self.paramater.crowd['ItemTable.btb']['names'][::2]
+        itemNames = self.paramater.crowd['ItemTable.btb']['strings'][::2]
         self.isDummy = {itemId: 'Dummy' in name for itemId, name in zip(itemIds, itemNames)}
         self.itemIdToName = {itemId:name for itemId, name in zip(itemIds, itemNames)}
 
