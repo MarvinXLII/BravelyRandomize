@@ -60,8 +60,8 @@ class ROM:
             self.abilities.shuffleSupportCosts()
 
         # Shuffle affinities (HP, MP, ...)
-        if self.settings['jobs-affinities']:
-            print('shuffling job affinities')
+        if self.settings['jobs-stat-affinities']:
+            print('shuffling job stat affinities')
             random.seed(self.seed)
             self.jobs.shuffleAffinities()
 
@@ -85,10 +85,9 @@ class ROM:
 
     def qualityOfLife(self):
 
-        if 'no-jp' in self.settings:
-            if self.settings['no-jp']:
-                print('Start at with Mastered jobs!')
-                self.jobs.zeroJP()
+        if self.settings['qol-mastered-jobs']:
+            print('Jobs will be Mastered!')
+            self.jobs.zeroJP()
 
         if 'no-exp'in self.settings:
             if self.settings['no-exp']:
@@ -143,8 +142,8 @@ class BS(ROM):
         super().randomize()
         
         # Shuffle equipment grades (S, A, ...)
-        if self.settings['jobs-aptitudes']:
-            print('Shuffling job aptitudes')
+        if self.settings['jobs-equip-aptitudes']:
+            print('Shuffling job equipment aptitudes')
             random.seed(self.seed)
             self.jobs.shuffleAptitudes()
             

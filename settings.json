@@ -4,17 +4,16 @@
   seed: 42
   jobs-magic: True
   jobs-support-costs: True
-  jobs-affinities: True
-  jobs-aptitudes: True
+  jobs-stat-affinities: True
+  jobs-equip-aptitudes: True
   jobs-specialties: True
   jobs-support: True
   jobs-commands: True
   jobs-aptitude: True
-  qol-exp: 20
-  qol-jp: 20
-  qol-pg: 20
+  qol-exp: 2
+  qol-jp: 2
+  qol-pg: 2
   qol-teleport-stones: True
+  qol-mastered-jobs: True
   treasures: True
-  no-jp: True
-  no-exp: True
 }

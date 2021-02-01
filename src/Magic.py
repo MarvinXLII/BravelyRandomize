@@ -155,7 +155,7 @@ class MAGIC_BD(MAGIC):
                 names = []
                 for i, a in zip(iIds, aIds):
                     if a >= 75 and a <= 92:
-                        names.append( self.items.getName(i) + ' (SF)' )
+                        names.append( self.items.getName(i) + ' (SM)' )
                     else:
                         names.append( self.items.getName(i) )
                 # Get detail row
