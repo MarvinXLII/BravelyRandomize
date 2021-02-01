@@ -10,7 +10,7 @@ import hashlib
 import sys
 sys.path.append('src')
 from Utilities import get_filename
-from Classes import ROM
+from ROM import BD, BS
 
 MAIN_TITLE = f"Bravely Randomize v{RELEASE}"
 
@@ -62,6 +62,7 @@ class GuiApplication:
 
         self.warnings = []
         self.togglers = []
+        self.gameTogglers = []
         self.settings = {}
         self.settings['release'] = tk.StringVar()
 
@@ -77,6 +78,8 @@ class GuiApplication:
 
         self.settings['rom'] = tk.StringVar()
         self.settings['rom'].set('')
+        self.settings['game'] = tk.StringVar()
+        self.settings['game'].set('')
 
         pathToPak = tk.Entry(lf, textvariable=self.settings['rom'], width=65, state='readonly')
         pathToPak.grid(row=0, column=0, columnspan=2, padx=(10,0), pady=3)
@@ -109,6 +112,9 @@ class GuiApplication:
             tabControl.add(tab, text=name)
         tabControl.grid(row=2, column=0, columnspan=20, sticky='news')
 
+        # Setup for toggling some buttons based on game used.
+        gameButtons = []
+        self.gameTogglers.append(self.toggler(gameButtons, 'game'))
         # Tab label
         for name, tab in tabs.items():
             labelDict = fields[name]
@@ -129,19 +135,13 @@ class GuiApplication:
                         self.settings[name] = tk.BooleanVar()
                         buttons = []
                         toggleFunction = self.toggler(buttons, name)
-                        button = ttk.Checkbutton(lf, text=vj['label'], variable=self.settings[name], command=toggleFunction)
+                        button = ttk.Checkbutton(lf, text=vj['label'], variable=self.settings[name], command=toggleFunction, state=tk.NORMAL)
                         button.grid(row=row, padx=10, sticky='we')
                         self.buildToolTip(button, vj)
+                        self.togglers.append(toggleFunction)
+                        if 'game' in vj:
+                            gameButtons.append((vj, button))
                         row += 1
-                        if 'indent' in vj:
-                            self.togglers.append(toggleFunction)
-                            for vk in vj['indent']:
-                                self.settings[vk['name']] = tk.BooleanVar()
-                                button = ttk.Checkbutton(lf, text=vk['label'], variable=self.settings[vk['name']], state=tk.DISABLED)
-                                button.grid(row=row, padx=30, sticky='w')
-                                self.buildToolTip(button, vk)
-                                buttons.append((self.settings[vk['name']], button))
-                                row += 1
 
                     elif vj['type'] == 'spinbox':
                         text = f"{vj['label']}:".ljust(20, ' ')
@@ -153,25 +153,6 @@ class GuiApplication:
                         box.grid(row=row, column=2, padx=10, sticky='we')
                         self.buildToolTip(box, vj)
                         row += 1
-
-                    elif vj['type'] == 'radiobutton':
-                        self.settings[name] = tk.BooleanVar()
-                        buttons = []
-                        toggleFunction = self.toggler(buttons, name)
-                        button = ttk.Checkbutton(lf, text=vj['label'], variable=self.settings[name], command=toggleFunction)
-                        button.grid(row=row, padx=10, sticky='we')
-                        self.buildToolTip(button, vj)
-                        self.togglers.append(toggleFunction)
-                        row += 1
-                        keyoption = name+'-option'
-                        self.settings[keyoption] = tk.StringVar()
-                        self.settings[keyoption].set(None)
-                        for ri in vj['radio']:
-                            radio = tk.Radiobutton(lf, text=ri['label'], variable=self.settings[keyoption], value=ri['value'], padx=15, state=tk.DISABLED)
-                            radio.grid(row=row, padx=14, sticky='w')
-                            self.buildToolTip(radio, ri)
-                            buttons.append((self.settings[keyoption], radio))
-                            row += 1
 
         # For warnings/text at the bottom
         self.canvas = tk.Canvas()
@@ -185,17 +166,22 @@ class GuiApplication:
         return False
 
     def checkROM(self, path):
-        # Check all files are correct
-        for name, sha256 in self.sha256.items():
-            fileName = os.path.join(path, name)
-            if not os.path.isfile(fileName):
-                return False
-            with open(fileName, 'rb') as file:
-                data = bytearray(file.read())
-            checksum = hashlib.sha256(data)
-            if checksum.hexdigest() != sha256:
-                return False
-        return True
+        # Check if all files exist
+        for game, digests in self.sha256.items():
+            # Check if all files exists
+            filenames = [os.path.join(path, key) for key in digests]
+            fileChecks = [os.path.isfile(f) for f in filenames]
+            if not all(fileChecks):
+                continue
+            # Check digests
+            for filename, digest in zip(filenames, digests.values()):
+                with open(filename, 'rb') as file:
+                    data = bytearray(file.read())
+                    x = hashlib.sha256(data).hexdigest()
+                    if x != digest:
+                        return False
+            return game            
+        return False
 
     def getRomPath(self, path=None):
         self.clearBottomLabels()
@@ -211,26 +197,26 @@ class GuiApplication:
             self.bottomLabel('Selected folder must be "romfs" or "RomFS".', 'red', 1)
             return
         # SHA256 checks
-        if not self.checkROM(path):
+        game = self.checkROM(path)
+        if not game:
             self.settings['rom'].set('')
             self.bottomLabel('Mrgrgrgrgr!', 'red', 0)
             self.bottomLabel('Must use unmodified files from a North American release.', 'red', 1)
             return
         # Set path to valid rom
         self.settings['rom'].set(path)
+        self.settings['game'].set(game)
+        for toggle in self.gameTogglers:
+            toggle()
 
     def toggler(self, lst, key):
         def f():
             if self.settings[key].get():
-                try: lst[0][1].select()
-                except: pass
                 for vi, bi in lst:
-                    bi.config(state=tk.NORMAL)
-            else:
-                for vi, bi in lst:
-                    if type(vi.get()) == bool: vi.set(False)
-                    if type(vi.get()) == str: vi.set(None)
-                    bi.config(state=tk.DISABLED)
+                    if self.settings['game'].get() in vi['game']:
+                        bi.config(state=tk.NORMAL)
+                    else:
+                        bi.config(state=tk.DISABLED)
         return f
 
     def buildToolTip(self, button, field):
@@ -275,11 +261,10 @@ class GuiApplication:
             settings = { key: value.get() for key, value in self.settings.items() }
         self.clearBottomLabels()
         self.bottomLabel('Randomizing....', 'blue', 0)
-        try:
-            randomize(settings)
+        if randomize(settings):
             self.clearBottomLabels()
             self.bottomLabel('Randomizing...done! Good luck!', 'blue', 0)
-        except:
+        else:
             self.clearBottomLabels()
             self.bottomLabel('Mrgrgrgrgr!', 'red', 0)
             self.bottomLabel('Randomizing failed.', 'red', 1)
@@ -287,43 +272,24 @@ class GuiApplication:
 
 def randomize(settings):
 
-    #########
-    # SETUP #
-    #########
-
-    if sys.executable.endswith('BravelyRandomize.exe'):
-        pwd = os.path.dirname(sys.executable)
+    if settings['game'] == 'BD':
+        rom = BD(settings)
+    elif settings['game'] == 'BS':
+        rom = BS(settings)
     else:
-        pwd = os.getcwd()
+        sys.exit(f"No option exists for game setting {settings['game']}!")
 
-    #############
-    # Randomize #
-    #############
+    try:
+        rom.randomize()
+        rom.qualityOfLife()
+        rom.dumpFiles()
+        rom.printLogs()
+        rom.printSettings()
+    except:
+        rom.fail() # REMOVE PATCH DIRECTORY
+        return False
 
-    rom = ROM(settings)
-    rom.randomize()
-    rom.qualityOfLife()
-    rom.patch()
-
-    ##########
-    # Output #
-    ##########
-    
-    outdir = os.path.join(pwd, f"seed_{settings['seed']}")
-    if os.path.isdir(outdir):
-        shutil.rmtree(outdir)
-    os.mkdir(outdir)
-
-    rom.printLogs(outdir)
-    rom.write(outdir)
-
-    #################
-    # Dump Settings #
-    #################
-
-    filename = os.path.join(outdir, 'settings.json')
-    with open(filename, 'w') as file:
-        hjson.dump(settings, file)
+    return True
 
 
 if __name__ == '__main__':

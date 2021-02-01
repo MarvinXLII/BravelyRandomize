@@ -2,34 +2,49 @@
   "Settings": {
     Jobs: [
       {      
-	name: jobs-abilities
-	label: Shuffle commands and support abilities
+	name: jobs-commands
+	label: Shuffle command abilities
 	type: checkbutton
-	help: "Shuffles abilities amongs jobs."
+	help: "Shuffles command abilities amongs jobs (e.g. Examine, High Jump)"
       }
       {      
-	name: jobs-spells
+	name: jobs-magic
 	label: Shuffle spells
 	type: checkbutton
-	help: "Shuffles spells among mages. Spell levels remain the same, e.g. Black Mage Level 1 could be replaced by White Mage Level 1, but not White Mage Level 5."
+	help: "Shuffles spells among mages at a fixed level (e.g. Level 1 Cure could swap with Fire, not Firaga)."
       }
       {
 	name: jobs-specialties
 	label: Randomly assign specialties
 	type: checkbutton
-	help: "Each job will be randomly assigned a support skill as their specialy."
+	help: "Each job will be randomly assigned a support skill as their specialty."
       }
       {      
-	name: jobs-sa-costs
+	name: jobs-support
+	label: Shuffle support abilities
+	type: checkbutton
+	help: "Shuffles support abilities amongs jobs (e.g. MP 10% Up, Abate Water)."
+      }
+      {      
+	name: jobs-support-costs
 	label: Shuffle costs of support abilities 
 	type: checkbutton
 	help: "Shuffles the costs of support abilities."
       }
       {      
-	name: jobs-stats
-	label: Shuffle stats
+	name: jobs-affinities
+	label: Shuffle affinities
 	type: checkbutton
 	help: "Shuffles HP, MP, ... stat scalings independently among all jobs."
+      }
+      {      
+	name: jobs-aptitudes
+	label: Shuffle aptitudes
+	type: checkbutton
+	help: "Shuffles equipment aptitudes (grades S, A, B, ....) of each job independently. (Only available for Bravely Second at this time.)"
+	game: [
+	  BS
+	]
       }
     ]
     "Quality of Life": [
@@ -76,9 +91,12 @@
     Treasures: [
       {
 	name: treasures
-	label: Random chests and hidden items
+	label: Randomize chests and hidden items
 	type: checkbutton
-	help: "Randomizes contents of chests and all hidden items. They can include spells!"
+	help: "Randomizes contents of chests and all hidden items. They can include spells! (Only available for Bravely Default at this time.)"
+	game: [
+	  BD
+	]
       }
     ]
   }

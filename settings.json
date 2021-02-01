@@ -1,14 +1,20 @@
 {
   rom: /path/to/romfs
+  game: BD
   seed: 42
-  jobs-abilities: True
-  jobs-spells: True
+  jobs-magic: True
+  jobs-support-costs: True
+  jobs-affinities: True
+  jobs-aptitudes: True
   jobs-specialties: True
-  jobs-sa-costs: True
-  jobs-stats: True
+  jobs-support: True
+  jobs-commands: True
+  jobs-aptitude: True
   qol-exp: 20
   qol-jp: 20
   qol-pg: 20
   qol-teleport-stones: True
   treasures: True
+  no-jp: True
+  no-exp: True
 }

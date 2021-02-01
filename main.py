@@ -1,13 +1,11 @@
-import os
-import random
-import hjson
 import sys
-sys.path.append('src')
+import hjson
 from gui import randomize
 
 def main(settings):
-    randomize(settings)
-    
+    if not randomize(settings):
+        print('Failed!')
+
 if __name__=='__main__':
     if len(sys.argv) != 2:
         sys.exit('Usage: python main.py settings.json')

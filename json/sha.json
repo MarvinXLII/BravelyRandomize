@@ -1,10 +1,26 @@
 {
-  Common_en/Battle/crowd.fs: 595ee93fcd03bf9a17d948c9f53fa9465f9f5e25d9c090ffbd515f659163fde2
-  Common_en/Battle/index.fs: 08f666c790c0de0e2fe547d44c7cb8cd9dab4a818cb44f8bf397844650d7f75e
-  Common_en/Paramater/crowd.fs: 0b112ef0df313dd3664e2455e42f13b3d2e84e029df69412c90dba6d3fb4da46
-  Common_en/Paramater/index.fs: 2e2ee5818b65f165acd33160d93b978b57bd9cc1f4730425053fb8fc4220b71e
-  Common_en/Shop/crowd.fs: 40b962a8f3603fe6b0b9611c1c7db8547a83876fdd5c2331ce15ad8709e32476
-  Common_en/Shop/index.fs: 52d3943b40269193bb4faaf879ffee0e60b574d4b1526e218fc3dfd4f7dab927
-  Common_en/TreasureTable/crowd.fs: c89b6a7e819115673de89f8297e3f0ec854d7dcc7359453859948afb0747d5fd
-  Common_en/TreasureTable/index.fs: a583a76bab3b14a1ecddf1f0614433c3f36fe0e7003398768730a8ba43dca28c
+  BD: {
+    Common_en/Battle/crowd.fs : 595ee93fcd03bf9a17d948c9f53fa9465f9f5e25d9c090ffbd515f659163fde2
+    Common_en/Battle/index.fs : 08f666c790c0de0e2fe547d44c7cb8cd9dab4a818cb44f8bf397844650d7f75e
+    Common_en/Shop/crowd.fs : 40b962a8f3603fe6b0b9611c1c7db8547a83876fdd5c2331ce15ad8709e32476
+    Common_en/Shop/index.fs : 52d3943b40269193bb4faaf879ffee0e60b574d4b1526e218fc3dfd4f7dab927
+    Common_en/Paramater/crowd.fs : 0b112ef0df313dd3664e2455e42f13b3d2e84e029df69412c90dba6d3fb4da46
+    Common_en/Paramater/index.fs : 2e2ee5818b65f165acd33160d93b978b57bd9cc1f4730425053fb8fc4220b71e
+    Common_en/TreasureTable/crowd.fs : c89b6a7e819115673de89f8297e3f0ec854d7dcc7359453859948afb0747d5fd
+    Common_en/TreasureTable/index.fs : a583a76bab3b14a1ecddf1f0614433c3f36fe0e7003398768730a8ba43dca28c
+  }
+  BS: {
+    Common_en/Parameter/Ability/crowd.fs : c63acfc302292facec9efab93f5765709551848c1fa96b1138d31d7ce76eaf04
+    Common_en/Parameter/Ability/index.fs : f9dc7bc24312eec2a68ec92f4c662d66c6bb67275ffb14f33f8d8ff60a1c2c3b
+    Common_en/Parameter/Pc/crowd.fs : f4763667b6ac9776626d9eb9ebe0c385c596db3b533a22609c964e522e9e5ff9
+    Common_en/Parameter/Pc/index.fs : bef19a1fa22c990250459ec8aa685ed1ae00e7972bee5d5c907e441b7af41694
+    Common_en/Parameter/DetailInfo/crowd.fs : 6c078df687720cd92df009dd8d9dd12525847e846eaf912cf2a6747415225963
+    Common_en/Parameter/DetailInfo/index.fs : 400b101447393f0eb74e9b16541065c79a9a25f5a394d35b22b74d5e6d1bfa7a
+    Common_en/Parameter/Job/crowd.fs : 18e0603939170361d0f5ddf40bc0ad304a29626a92b5fda59c4343fab5858914
+    Common_en/Parameter/Job/index.fs : 0e6a57e40578ce0c5e09b5cecad8ddfed3275c68200a7d14d8661756dd381c26
+    Common_en/Battle/crowd.fs : 139946ee0220d4c0fce68ee8560ed2a10d9b17a4602ccd5d0bdda7b7f71187cc
+    Common_en/Battle/index.fs : 943ecb1d23f00e77fd5437b64461318bf824ebd702ee03c1b32cff46a5b772fe
+    Common_en/Shop/crowd.fs : 6b0908d361eec1d60ce4d17d1a47d830eb93f8c9c5c263f34d2d6f6ce1b074d8
+    Common_en/Shop/index.fs : 1149b6199ffb998a740a83ade3d0fb33c8ea20d7d1ed98ff54c39b37c78c62c7
+  }
 }
