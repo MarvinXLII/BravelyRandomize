@@ -6,7 +6,7 @@ American releases.
 
 **OPTIONS**
 
-Several options are available:
+Several options are available for both games:
 
 - Shuffle job abilities (commands, spells, and support skills).
 
@@ -16,7 +16,7 @@ Several options are available:
 
 - QOL: Scale experience, JP, and pg earned from battles.
 
-Several options are only available to specific games (unfortunatly).
+A few options are only available to specific games (unfortunately).
 
 - Shuffle treasure chests and hidden items (only Bravely Default)
 
