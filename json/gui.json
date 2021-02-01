@@ -50,7 +50,7 @@
     "Quality of Life": [
       {      
 	name: qol-exp
-	label: Rescale EXP earned.
+	label: Rescale EXP earned
 	type: spinbox
 	help: "Recales the Experience earned from battles."
 	spinbox: {
@@ -61,7 +61,7 @@
       }
       {      
 	name: qol-jp
-	label: Rescale JP earned.
+	label: Rescale JP earned
 	type: spinbox
 	help: "Recales the Job Points earned from battles."
 	spinbox: {
@@ -72,7 +72,7 @@
       }
       {      
 	name: qol-pg
-	label: Rescale pg earned.
+	label: Rescale pg earned
 	type: spinbox
 	help: "Recales the pg earned from battles."
 	spinbox: {
@@ -83,7 +83,7 @@
       }
       {      
 	name: qol-teleport-stones
-	label: Teleport Stones cost 0 pg.
+	label: Teleport Stones cost 0 pg
 	type: checkbutton
 	help: "Teleport Stones can be bought from shops for 0 pg. Their selling value is also reduced to 0 pg."
       }
@@ -91,7 +91,7 @@
 	name: qol-mastered-jobs
 	label: Mastered jobs 
 	type: checkbutton
-	help: "All jobs will be mastered. You will still need to collect the job's asterisk before having access the job. (Recommended for Ch. 5-8 of Bravely Default.)"
+	help: "All jobs will be mastered. You will still need to collect each job's asterisk before having access to that job. (Recommended for Ch. 5-8 of Bravely Default.)"
       }
     ]
     Treasures: [
