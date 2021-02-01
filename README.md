@@ -1,10 +1,10 @@
-**ABOUT**
+### ABOUT
 
 This is a randomizer for Bravely Default: Where the Fairy Flies and
 Bravely Second: End Layer. It has been built and tested only on North
 American releases.
 
-**OPTIONS**
+### OPTIONS
 
 Several options are available for both games:
 
@@ -22,7 +22,7 @@ A few options are only available to specific games (unfortunately).
 
 - Shuffle job equipment stats ("aptitudes") (only Bravely Second)
 
-**USAGE**
+### USAGE
 
 To run the executable from the Releases page, it is assumed that you
 have [extracted RomFS from your
@@ -38,3 +38,5 @@ file `settings.json`, and a folder `romfs`. The settings file is a
 record of selected options. The `romfs` folder is the patch generated
 for your game. It can be run on your console with [Luma
 LayeredFS](https://gist.github.com/PixelSergey/5dbb4a9b90d290736353fa58e4fcbb42).
+
+During gameplay, _**your Text Settings must be set to English**_ for any of your patches to work.
