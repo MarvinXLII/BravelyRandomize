@@ -25,7 +25,7 @@ Several options are only available to specific games (unfortunatly).
 **USAGE**
 
 To run the executable from the Releases page, it is assumed that you
-have [dumped your
+have [extracted RomFS from your
 cartridge](https://gist.github.com/PixelSergey/73d0a4bc1437dbaa53a1d1ce849fdda1).
 It will not work with `*.3ds`, `*.cia`, etc. files. The executable
 requires that you input the path to (and including) the folder
