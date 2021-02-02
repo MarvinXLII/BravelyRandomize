@@ -35,7 +35,10 @@ class ABILITIES_BD(ABILITIES):
         self.jobComIdToName = {i:n for i,n in zip(self.jobComIds, self.jobComNames)}
 
         self.comAbilNames = self.comAbilFile.readTextStringAll(4)
-        self.comAbilIdToName = {i:n for i,n in zip(self.comAbilIds, self.comAbilNames)}
+        self.comAbilIdToName = {}
+        for i, n in zip(self.comAbilIds, self.comAbilNames):
+            if not i in self.comAbilIdToName: # Skip repeats!
+                self.comAbilIdToName[i] = n
 
         self.supAbilNames = self.supAbilFile.readTextStringAll(3)
         self.supAbilIdToName = {i:n for i,n in zip(self.supAbilIds, self.supAbilNames)}
@@ -76,7 +79,10 @@ class ABILITIES_BS(ABILITIES):
         self.jobComIdToName = {i:n for i,n in zip(self.jobComIds, self.jobComNames)}
 
         self.comAbilNames = self.comAbilFile.readTextStringAll(4)
-        self.comAbilIdToName = {i:n for i,n in zip(self.comAbilIds, self.comAbilNames)}
+        self.comAbilIdToName = {}
+        for i, n in zip(self.comAbilIds, self.comAbilNames):
+            if not i in self.comAbilIdToName: # Skip repeats!
+                self.comAbilIdToName[i] = n
 
         self.supAbilNames = self.supAbilFile.readTextStringAll(4)
         self.supAbilIdToName = {i:n for i,n in zip(self.supAbilIds, self.supAbilNames)}

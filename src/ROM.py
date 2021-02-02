@@ -149,7 +149,7 @@ class BS(ROM):
             
     def printLogs(self):
         temp = sys.stdout
-        sys.stdout = open(os.path.join(self.pathOut, 'spoiler.log'), 'w')
+        sys.stdout = open(os.path.join(self.pathOut, 'spoiler.log'), 'w', encoding='utf-8')
         self.jobs.print()
         self.magic.print()
         sys.stdout = temp
@@ -194,7 +194,7 @@ class BD(ROM):
             
     def printLogs(self):
         temp = sys.stdout
-        sys.stdout = open(os.path.join(self.pathOut, 'spoiler.log'), 'w')
+        sys.stdout = open(os.path.join(self.pathOut, 'spoiler.log'), 'w', encoding='utf-8')
         self.jobs.print()
         self.magic.print()
         self.treasures.print()

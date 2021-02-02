@@ -5,6 +5,10 @@ class FILE:
     def __init__(self, data):
         self.data = data
         self.address = 0
+        self.encoding = {
+            1: 'utf-8',
+            2: 'utf-16',
+        }
 
     def read(self, size=4):
         value = int.from_bytes(self.data[self.address:self.address+size], byteorder='little', signed=True)
@@ -13,13 +17,15 @@ class FILE:
 
     def readValue(self, address, size=4):
         return int.from_bytes(self.data[address:address+size], byteorder='little', signed=True)
-    
+
     def readString(self, size=1):
-        string = ''
-        n = self.read(size=size)
-        while n > 0:
-            string += chr(n)
-            n = self.read(size=size)
+        # Find end of string
+        addrStart = self.address
+        while self.address < len(self.data) and self.data[self.address]:
+            self.address += size
+        # Decode string
+        string = self.data[addrStart:self.address].decode(self.encoding[size])
+        # Increment address up to the next string
         while self.address < len(self.data):
             if self.data[self.address] > 0:
                 break
@@ -148,11 +154,10 @@ class DATAFILE(FILE):
         # Check string first to ensure it fits!
         check = self.readTextString(row, col)
         assert len(check) >= len(string), 'String is too long!'
-        # Build new bytearray
-        string = string.encode()
-        newString = bytearray([0]*len(check)*2)
-        for i, s in enumerate(string):
-            newString[i*2] = s
+        sizeDiff = 2 * (len(check) - len(string))
+        # Encode string
+        newString = string.encode('utf-16')[2:]
+        newString += bytearray([0]*sizeDiff)
         # Patch
         offset = self.readValue(row, col)
         address = self.textBase + offset
