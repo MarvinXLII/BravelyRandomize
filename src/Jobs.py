@@ -204,9 +204,9 @@ class JOBS_BS(JOBS):
             'Knuckles': 17,
             'G. Swds': 18,
             'Pistols': 19,
-            'Armor': 21,
-            'Helms': 22,
             'Shields': 24,
+            'Helms': 21,
+            'Armor': 22,
         }
         aptToGrade = {
             200: 'S',
