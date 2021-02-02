@@ -40,3 +40,7 @@ for your game. It can be run on your console with [Luma
 LayeredFS](https://gist.github.com/PixelSergey/5dbb4a9b90d290736353fa58e4fcbb42).
 
 During gameplay, _**your Text Settings must be set to English**_ for any of your patches to work.
+
+### KNOWN BUGS
+
+Bravely Second: Janne and Nikolai do not have animations for all possible abilities, leading to crashes during battles. Stick with just basic attacks when they are in your party.
