@@ -2,18 +2,17 @@
   rom: /path/to/romfs
   game: BD
   seed: 42
-  jobs-magic: True
-  jobs-support-costs: True
-  jobs-stat-affinities: True
-  jobs-equip-aptitudes: True
-  jobs-specialties: True
-  jobs-support: True
-  jobs-commands: True
-  jobs-aptitude: True
+  jobs-commands: true
+  jobs-magic: true
+  jobs-specialties: true
+  jobs-support: true
+  jobs-support-costs: true
+  jobs-stat-affinities: true
+  jobs-equip-aptitudes: false
   qol-exp: 2
-  qol-jp: 2
+  qol-jp: 4
   qol-pg: 2
-  qol-teleport-stones: True
-  qol-mastered-jobs: True
-  treasures: True
+  qol-teleport-stones: true
+  qol-mastered-jobs: false
+  treasures: true
 }
