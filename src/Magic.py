@@ -60,12 +60,10 @@ class MAGIC:
         ## UPDATE RED MAGE
         redMageFile = self.abilities.crowdFiles['AbilityWBM.btb']
         abilIdCol = redMageFile.readCol(1)
-        for key in abilIdCol:
+        for row, key in enumerate(abilIdCol):
             # Load "new" data
             abilId = self.data[key]['swap']['abilId']
             itemId = self.data[key]['swap']['itemId']
-            # Load row from item table
-            row = self.items.getRow(itemId)
             # Patch ability table
             redMageFile.patchValue(abilId, row, 1)
             redMageFile.patchValue(itemId, row, 2)
