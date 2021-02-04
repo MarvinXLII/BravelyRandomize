@@ -55,29 +55,35 @@ class ROM:
 
         # Shuffle support ability costs
         if self.settings['jobs-support-costs']:
-            print('shuffling support ability costs')
+            print('Shuffling support ability costs')
             random.seed(self.seed)
             self.abilities.shuffleSupportCosts()
 
         # Shuffle affinities (HP, MP, ...)
         if self.settings['jobs-stat-affinities']:
-            print('shuffling job stat affinities')
+            print('Shuffling job stat affinities')
             random.seed(self.seed)
             self.jobs.shuffleAffinities()
 
         # Shuffle specialties
         if self.settings['jobs-specialties']:
-            print('randomizing job specialties')
+            print('Randomizing job specialties')
             random.seed(self.seed)
             self.jobs.randomSpecialties()
 
         
         # Shuffle command abilities
         if self.settings['jobs-commands']:
-            print('shuffling job commands')
+            print('Shuffling job commands')
             random.seed(self.seed)
             self.jobs.shuffleCommands()
 
+        # Shuffle support abilities
+        if self.settings['jobs-support']:
+            print('Shuffling job support')
+            random.seed(self.seed)
+            self.jobs.shuffleSupport()
+        
     def qualityOfLife(self):
 
         if self.settings['qol-mastered-jobs']:
@@ -141,7 +147,7 @@ class BS(ROM):
             print('Shuffling job equipment aptitudes')
             random.seed(self.seed)
             self.jobs.shuffleAptitudes()
-            
+
     def printLogs(self):
         temp = sys.stdout
         sys.stdout = open(os.path.join(self.pathOut, 'spoiler.log'), 'w', encoding='utf-8')
@@ -187,12 +193,6 @@ class BD(ROM):
             random.seed(self.seed)
             self.treasures.shuffleTreasures()
             
-        # Shuffle support abilities
-        if self.settings['jobs-support']:
-            print('shuffling job support')
-            random.seed(self.seed)
-            self.jobs.shuffleSupport()
-        
     def printLogs(self):
         temp = sys.stdout
         sys.stdout = open(os.path.join(self.pathOut, 'spoiler.log'), 'w', encoding='utf-8')

@@ -166,13 +166,22 @@ class JOBS_BS(JOBS):
 
     # Support abilities
     def shuffleSupport(self):
+        ## TEMPORARY FIX: ALSO MODIFIES JOBID COLUMN IN SUPABIL FILE
+        ## THERE SEEMS TO BE NO NEED FOR THIS IN BS
+        ## TODO: TEST TO SEE WHY IT EXISTS IN BD; ANY SIDE EFFECTS IN BD/BS
+        jobIds = self.abilities.supAbilFile.readCol(2)
         candidates = list(self.supportIDs)
         random.shuffle(candidates)
         for jobFile in self.jobFiles.values():
             abilities = jobFile.readCol(13)
             for i in range(len(abilities)):
                 if abilities[i] >= 20000:
-                    abilities[i] = candidates.pop()
+                    row = self.abilities.getSupRow(abilities[i])
+                    jobId = jobIds[row]
+                    abilId = candidates.pop()
+                    abilities[i] = abilId
+                    row2 = self.abilities.getSupRow(abilities[i])
+                    self.abilities.supAbilFile.patchValue(jobId, row2, 2)
             jobFile.patchCol(abilities, 13)
 
     # Shuffle commands (non-mages)

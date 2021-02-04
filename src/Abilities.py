@@ -9,9 +9,13 @@ class ABILITIES:
         self.jobComIds = self.jobComFile.readCol(0)
         self.comAbilIds = self.comAbilFile.readCol(0)
         self.supAbilIds = self.supAbilFile.readCol(0)
+        self.supAbilIdToRow = {i:r for r,i in enumerate(self.supAbilIds)}
 
     def getJobName(self, fileName):
         return self.fileToMage[fileName]
+
+    def getSupRow(self, supAbilId):
+        return self.supAbilIdToRow[supAbilId]
     
     def getSupCosts(self, id):
         assert id in self.supAbilIdToName, f"{id} not in supAbilIdToName"
