@@ -121,12 +121,15 @@ class JOBS_BD(JOBS):
             abilIds = jobFile.readCol(13)
             jobComm = jobFile.readCol(16)
             for level, (abilId, jobComId) in enumerate(zip(abilIds, jobComm)):
-                if abilId:
-                    print(f'  {level+1} '.rjust(7, ' '), self.abilities.getName(abilId))
-                elif jobComId < 1000 or jobComId > 2000:
+                if abilId == 0:
+                    # Magic/Summon level
                     print(f'  {level+1} '.rjust(7, ' '), self.abilities.getName(jobComId))
+                elif abilId < 1000:
+                    # Command
+                    print(f'  {level+1} '.rjust(7, ' '), self.abilities.getName(abilId).ljust(20, ' '))
                 else:
-                    print(f'  {level+1} '.rjust(7, ' '), self.abilities.getName(jobComIds).ljust(20, ' '), f'{self.abilities.getSupCosts(id)} SP')
+                    # Support
+                    print(f'  {level+1} '.rjust(7, ' '), self.abilities.getName(abilId).ljust(20, ' '), f'{self.abilities.getSupCosts(abilId)} SP')
             print('')
             print('')
         print('')
