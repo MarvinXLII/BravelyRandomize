@@ -71,11 +71,6 @@ class ROM:
             random.seed(self.seed)
             self.jobs.randomSpecialties()
 
-        # Shuffle support abilities
-        if self.settings['jobs-support']:
-            print('shuffling job support')
-            random.seed(self.seed)
-            self.jobs.shuffleSupport()
         
         # Shuffle command abilities
         if self.settings['jobs-commands']:
@@ -192,6 +187,12 @@ class BD(ROM):
             random.seed(self.seed)
             self.treasures.shuffleTreasures()
             
+        # Shuffle support abilities
+        if self.settings['jobs-support']:
+            print('shuffling job support')
+            random.seed(self.seed)
+            self.jobs.shuffleSupport()
+        
     def printLogs(self):
         temp = sys.stdout
         sys.stdout = open(os.path.join(self.pathOut, 'spoiler.log'), 'w', encoding='utf-8')

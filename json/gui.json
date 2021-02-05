@@ -23,7 +23,10 @@
 	name: jobs-support
 	label: Shuffle support abilities
 	type: checkbutton
-	help: "Shuffles support abilities amongs jobs (e.g. MP 10% Up, Abate Water)."
+	help: "Shuffles support abilities amongs jobs (e.g. MP 10% Up, Abate Water). (Only available for Bravely Default at this time.)"
+	game: [
+	  BD
+	]
       }
       {      
 	name: jobs-support-costs

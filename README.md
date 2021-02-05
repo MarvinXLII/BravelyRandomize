@@ -20,7 +20,10 @@ A few options are only available to specific games (unfortunately).
 
 - Shuffle treasure chests and hidden items (only Bravely Default)
 
+- Shuffle support abilities (only Bravely Default)
+
 - Shuffle job equipment stats ("aptitudes") (only Bravely Second)
+
 
 ### USAGE
 
