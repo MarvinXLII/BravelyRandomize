@@ -5,7 +5,7 @@
 	name: jobs-commands
 	label: Shuffle command abilities
 	type: checkbutton
-	help: "Shuffles command abilities amongs jobs (e.g. Examine, High Jump)"
+	help: "Shuffles command abilities among jobs (e.g. Examine, High Jump)"
       }
       {      
 	name: jobs-magic
@@ -17,13 +17,13 @@
 	name: jobs-specialties
 	label: Randomly assign specialties
 	type: checkbutton
-	help: "Each job will be randomly assigned a support skill as their specialty."
+	help: "Each job will be randomly assigned a support skill as its specialty."
       }
       {      
 	name: jobs-support
 	label: Shuffle support abilities
 	type: checkbutton
-	help: "Shuffles support abilities amongs jobs (e.g. MP 10% Up, Abate Water)."
+	help: "Shuffles support abilities among jobs (e.g. MP 10% Up, Abate Water)."
       }
       {      
 	name: jobs-support-costs
