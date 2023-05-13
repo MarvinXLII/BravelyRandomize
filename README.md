@@ -44,4 +44,4 @@ During gameplay, _**your Text Settings must be set to English**_ for any of your
 
 ### KNOWN BUGS
 
-Bravely Second: Janne and Nikolai do not have animations for all possible abilities, leading to crashes during battles. Stick with just basic attacks when they are in your party.
+Bravely Second: Janne and Nikolai do not have animations for all possible abilities, leading to crashes during battles. Stick with just basic attacks when they are in your party. You may need to toggle off your patch until they leave your party if crashes persist.
