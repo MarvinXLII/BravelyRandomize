@@ -160,11 +160,86 @@ class JOBS_BS(JOBS):
         self.commandIDs = list(filter(lambda x: x < 20000, allAbilities))
         self.supportIDs = list(filter(lambda x: x >= 20000, allAbilities))
 
+        self.loreIds = { # vanilla lore in jobs
+            20103: 'Knight', # 'Shield',
+            20201: 'Black Mage', # 'Rod',
+            20402: 'Monk', # 'Knuckle',
+            20502: 'Ranger', # 'Bow',
+            20901: 'Swordmaster', # 'Katana',
+            21002: 'Pirate', # 'Axe',
+            21201: 'Templar', # 'Greatsword',
+            21701: 'Valkyrie', # 'Spear',
+            22101: 'Thief', # 'Dagger',
+            22404: 'Fencer', # 'Sword',
+            22502: 'Bishop', # 'Staff',
+            23002: 'Hawkeye', # 'Rifle',
+            23003: 'Guardian', # 'Armor',
+        }
+        self.colToLore = { # vanilla lore in jobs
+            24: 20103, # 'Shield',
+            12: 20201, # 'Rod',
+            17: 20402, # 'Knuckle',
+            15: 20502, # 'Bow',
+            16: 20901, # 'Katana',
+            10: 21002, # 'Axe',
+            18: 21201, # 'Greatsword',
+            11: 21701, # 'Spear',
+            14: 22101, # 'Dagger',
+            9:  22404, # 'Sword',
+            13: 22502, # 'Staff',
+            10: 23002, # 'Rifle',
+            22: 23003, # 'Armor',
+        }
+        self.loreInJobs = {i: None for i in self.loreIds}
+        self.aptJobToRow = {
+            'Freelancer': 0,
+            'Knight': 1,
+            'Black Mage': 2,
+            'White Mage': 3,
+            'Monk': 4,
+            'Ranger': 5,
+            'Ninja': 6,
+            'Time Mage': 7,
+            'Swordmaster': 8,
+            'Pirate': 9,
+            'Dark Knight': 10,
+            'Templar': 11,
+            'Summoner': 12,
+            'Valkyrie': 13,
+            'Red Mage': 14,
+            'Thief': 15,
+            'Merchant': 16,
+            'Performer': 17,
+            'Fencer': 18,
+            'Bishop': 19,
+            'Wizard': 20,
+            'Charioteer': 21,
+            'Catmancer': 22,
+            'Astrologian': 23,
+            'Hawkeye': 24,
+            'Patissier': 25,
+            'Exorcist': 26,
+            'Guardian': 27,
+            'Yōkai': 28,
+            'Kaiser': 29,
+        }
+
     # Equipment
     def shuffleAptitudes(self):
         for col in range(9, 25): # NB: cols 20, 23, and 25 are all 200 and probably unused
             data = self.jobTable.readCol(col)
             random.shuffle(data)
+
+            ##### Any X Lore support skill require the corresponding aptitude be 200
+            if col in self.colToLore:
+                loreId = self.colToLore[col]
+                vanillaJobWithLore = self.loreIds[loreId]
+                i = self.aptJobToRow[vanillaJobWithLore]
+                s = [d == 200 for d in data]
+                j = random.choices(range(len(s)), s, k=1)[0]
+                data[i], data[j] = data[j], data[i]
+                assert data[i] == 200
+            
             self.jobTable.patchCol(data, col)
 
     # Support abilities
@@ -175,7 +250,7 @@ class JOBS_BS(JOBS):
         jobIds = self.abilities.supAbilFile.readCol(2)
         candidates = list(self.supportIDs)
         random.shuffle(candidates)
-        for jobFile in self.jobFiles.values():
+        for job, jobFile in self.jobFiles.items():
             abilities = jobFile.readCol(13)
             for i in range(len(abilities)):
                 if abilities[i] >= 20000:
@@ -185,6 +260,8 @@ class JOBS_BS(JOBS):
                     abilities[i] = abilId
                     row2 = self.abilities.getSupRow(abilities[i])
                     self.abilities.supAbilFile.patchValue(jobId, row2, 2)
+                    if abilId in self.loreIds:
+                        self.loreInJobs[abilId] = job
             jobFile.patchCol(abilities, 13)
 
     # Shuffle commands (non-mages)

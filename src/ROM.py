@@ -143,6 +143,7 @@ class BS(ROM):
         super().randomize()
         
         # Shuffle equipment grades (S, A, ...)
+        # Must stay AFTER shuffling skills
         if self.settings['jobs-equip-aptitudes']:
             print('Shuffling job equipment aptitudes')
             random.seed(self.seed)
